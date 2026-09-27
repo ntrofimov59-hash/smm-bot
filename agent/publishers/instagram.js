@@ -1,6 +1,5 @@
 // agent/publishers/instagram.js — production-публикация в Instagram
 // Использует application/x-www-form-urlencoded через URLSearchParams
-import fs from 'fs';
 import * as usage from '../usage.js';
 
 const IG_API = 'https://graph.instagram.com/v21.0';

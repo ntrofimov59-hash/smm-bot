@@ -31,7 +31,7 @@ export async function notify(text, { parseMode = 'HTML', prefix = '🤖 <b>[SMM]
   }
 }
 
-export async function notifyPublished({ projectSlug, accounts, caption, postId, imageUrl }) {
+export async function notifyPublished({ projectSlug, accounts, caption, postId: _postId, imageUrl }) {
   const accList = accounts.map(a => `@${a.username}`).join(', ');
   const text = `✅ <b>Опубликовано</b>
 

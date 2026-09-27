@@ -1,6 +1,4 @@
 // agent/sources/index.js — диспетчер источников + fetch → download → inbox
-import fs from 'fs';
-import path from 'path';
 import { downloadImage } from './downloader.js';
 import { fetchPinterestBoard } from './pinterest.js';
 import { fetchOwnMedia, fetchUserMedia } from './instagram-graph.js';

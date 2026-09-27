@@ -1,6 +1,5 @@
 // agent/image-processor.js — единая стилистика + вотермарка для всех фото
 import fs from 'fs';
-import path from 'path';
 import sharp from 'sharp';
 
 /**
@@ -154,16 +153,6 @@ function logoPositions(position, W, H, logoW, logoH, pad) {
   }
 }
 
-function positionToGravity(pos) {
-  const map = {
-    'top-left': 'northwest',
-    'top-right': 'northeast',
-    'bottom-left': 'southwest',
-    'bottom-right': 'southeast',
-    'center': 'center',
-  };
-  return { gravity: map[pos] || 'southeast' };
-}
 
 function buildWatermarkSvg({ text, fontSize = 24, opacity = 0.65, position = 'bottom-right', padding = 24, noBackground = false }, W, H) {
   const fontFamily = 'Inter, Arial, sans-serif';
