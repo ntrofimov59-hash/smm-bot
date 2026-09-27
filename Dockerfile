@@ -25,8 +25,10 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # Исходники
 COPY . .
 
-# Только prod-зависимости в runtime
-RUN pnpm prune --prod
+# Только prod-зависимости в runtime.
+# HUSKY=0 — prepare-скрипт husky не запускается, иначе падает:
+# husky в devDeps и уже удалён к этому моменту.
+RUN HUSKY=0 pnpm prune --prod
 
 
 # -------- runtime --------

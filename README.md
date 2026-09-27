@@ -193,6 +193,44 @@ LIMIT_POSTS_DAY=20
     pm2 start ecosystem.config.cjs
     pm2 save
 
+
+## Monitoring
+
+Встроенный HTTP-сервер (0 зависимостей) для healthcheck и метрик.
+
+### Endpoints
+
+    curl http://localhost:3000/health    # liveness: { status, uptime, version }
+    curl http://localhost:3000/status    # полный JSON: queue + usage + backend
+    curl http://localhost:3000/metrics   # Prometheus формат
+
+### Пример /status
+
+    {
+      "status": "ok",
+      "uptime": 3600,
+      "uptimeHuman": "1h 0m",
+      "version": "1.0.0",
+      "backend": "json",
+      "queue": { "pending": 0, "publishing": 0, "published": 3, "failed": 0, "total": 3 },
+      "usage": {
+        "today": { "groq_tokens": 0, "gemini_requests": 0, "posts": 0, "cache_hits": 0 },
+        "limits": { "groq_tokens_day": 200000, "gemini_requests_day": 1500, "posts_day": 20 }
+      }
+    }
+
+### Docker healthcheck
+
+`docker-compose.yml` содержит `HEALTHCHECK` — Docker сам считает контейнер healthy/unhealthy и перезапускает при необходимости.
+
+    docker compose ps
+    # STATUS: Up 5 minutes (healthy)
+
+### Отключить
+
+    # .env
+    HEALTH_PORT=0
+
 ## Testing
 
 Стек: **Vitest** + **@vitest/coverage-v8** + `vi.stubGlobal('fetch')` для мок-тестов API.
