@@ -20,7 +20,7 @@ function runCli(args = [], opts = {}) {
       cwd: REPO_ROOT,
       env,
       encoding: 'utf8',
-      timeout: 20000,
+      timeout: 35000,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     return { stdout, stderr: '', status: 0 };

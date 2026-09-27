@@ -12,7 +12,7 @@
     "refresh-tokens": "node agent/refresh-tokens.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:cov": "vitest run --coverage",
+    "test:cov": "VITEST_COVERAGE=1 vitest run --coverage",
     "prepare": "husky",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"

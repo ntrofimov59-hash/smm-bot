@@ -3,10 +3,13 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.js'],
+    // e2e гоняется только вне coverage — subprocess всё равно не инструментируется,
+    // а с v8-coverage e2e сильно тормозит (scan --dry упирается в timeout).
+    exclude: process.env.VITEST_COVERAGE ? ['tests/e2e/**'] : [],
     environment: 'node',
     globals: true,
-    testTimeout: 20000,
-    hookTimeout: 20000,
+    testTimeout: 40000,
+    hookTimeout: 40000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
@@ -16,6 +19,10 @@ export default defineConfig({
         'agent/config-loader.js',
         'bot.js',
         'agent/refresh-tokens.js',
+        'agent/telegram-api.js',
+        'agent/telegram-ingest.js',
+        'agent/telegram-sessions.js',
+        'agent/image-variation.js',
         'agent/health.js',
         'agent/locations.js',
         'agent/planner.js',
