@@ -18,6 +18,7 @@ vi.mock('../../agent/telegram-api.js', async () => {
 });
 
 let tmpDir;
+let tmpProjectsDir;
 let ingest;
 
 const PHOTO_UPDATE = (chatId, userId, mediaGroupId = null, forwardOrigin = null) => ({
@@ -34,11 +35,21 @@ const PHOTO_UPDATE = (chatId, userId, mediaGroupId = null, forwardOrigin = null)
 
 beforeEach(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ing-'));
+  tmpProjectsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ing-proj-'));
+
+  // Создаём tmp-проект 'coucou-events' чтобы handlePhoto писал сюда, а не в реальный projects/
+  const projectDir = path.join(tmpProjectsDir, 'coucou-events');
+  fs.mkdirSync(path.join(projectDir, 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'project.json'), JSON.stringify({
+    slug: 'coucou-events', timezone: 'UTC', publishing: { bestHours: ['11:00'] },
+  }));
+
   vi.stubEnv('SMM_DATA_DIR', tmpDir);
+  vi.stubEnv('PROJECTS_ROOT', tmpProjectsDir);
   vi.stubEnv('TELEGRAM_INGEST_USERS', '12345');
   vi.stubEnv('TELEGRAM_INGEST_DEFAULT_PROJECT', 'coucou-events');
   vi.resetModules();
-  mockDownload.mockReset().mockResolvedValue(Buffer.from('fake-jpeg'));
+  mockDownload.mockReset().mockResolvedValue(Buffer.from('fake-jpeg'.padEnd(200, 'x')));
   mockSend.mockReset().mockResolvedValue({});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -49,6 +60,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
   fs.rmSync(tmpDir, { recursive: true, force: true });
+  fs.rmSync(tmpProjectsDir, { recursive: true, force: true });
 });
 
 describe('extractForwardInfo', () => {
@@ -169,5 +181,51 @@ describe('processMediaGroup — album', () => {
     expect(r.ok).toBe(true);
     expect(r.count).toBe(0);
     expect(mockSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('isolation: не пишет в реальные projects/', () => {
+  it('handlePhoto пишет в $PROJECTS_ROOT, не в настоящий projects/', async () => {
+    const u = PHOTO_UPDATE(100, 12345);
+    await ingest.processUpdate(u);
+
+    // Файл должен быть в tmpProjectsDir
+    const tmpInbox = path.join(tmpProjectsDir, 'coucou-events', 'inbox');
+    const files = fs.readdirSync(tmpInbox).filter(f => f.endsWith('.jpg'));
+    expect(files.length).toBeGreaterThan(0);
+
+    // И НЕ в реальном projects/
+    const realInbox = path.resolve('projects', 'coucou-events', 'inbox');
+    if (fs.existsSync(realInbox)) {
+      const realFiles = fs.readdirSync(realInbox).filter(f => f.endsWith('.jpg'));
+      // Может быть тестовый мусор от прошлых прогонов, но новых быть не должно
+      // Проверяем, что timestamp свежих файлов < 1 сек назад
+      const now = Date.now();
+      for (const f of realFiles) {
+        const m = f.match(/^(\d+)-tg/);
+        if (m) {
+          const ts = Number(m[1]);
+          expect(now - ts).toBeGreaterThan(5000); // старше 5 сек = не наш
+        }
+      }
+    }
+  });
+
+  it('handleDocument малого размера → skipped, не сохраняется', async () => {
+    mockDownload.mockResolvedValueOnce(Buffer.from('tiny'));
+    const u = {
+      update_id: Date.now(),
+      message: {
+        message_id: 1,
+        chat: { id: 100 },
+        from: { id: 12345 },
+        document: { file_id: 'f1', file_name: 'small.jpg', mime_type: 'image/jpeg' },
+      },
+    };
+    const r = await ingest.processUpdate(u);
+    // Не сохранился, но ошибок не дал
+    expect(r.ok).toBe(true);
+    expect(r.saved).toBe(0);
+    expect(r.skipped).toBe(1);
   });
 });

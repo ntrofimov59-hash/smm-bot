@@ -19,7 +19,11 @@ import unzipper from 'unzipper';
 import { getUpdates, sendMessage, downloadByFileId } from './telegram-api.js';
 import { setProject, getProject, listProjects } from './telegram-sessions.js';
 
-const PROJECTS_ROOT = path.resolve(new URL('../projects/', import.meta.url).pathname);
+function getProjectsRoot() {
+  return process.env.PROJECTS_ROOT
+    ? path.resolve(process.env.PROJECTS_ROOT)
+    : path.resolve(new URL('../projects/', import.meta.url).pathname);
+}
 
 const IMAGE_EXT = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.gif', '.tiff', '.tif', '.bmp',
@@ -49,7 +53,7 @@ function uniqueFilename() {
 }
 
 function ensureInbox(projectSlug) {
-  const dir = path.join(PROJECTS_ROOT, projectSlug, 'inbox');
+  const dir = path.join(getProjectsRoot(), projectSlug, 'inbox');
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -188,6 +192,11 @@ async function handlePhoto(message, projectSlug, opts) {
   const largest = photos[photos.length - 1];
 
   const buf = await downloadByFileId(largest.file_id, opts);
+
+  if (buf.length < 100) {
+    throw new Error(`файл подозрительно маленький (${buf.length} байт) — вероятно не картинка`);
+  }
+
   const dir = ensureInbox(projectSlug);
   const filename = uniqueFilename() + '.jpg';
   fs.writeFileSync(path.join(dir, filename), buf);
@@ -214,6 +223,11 @@ async function handleDocument(message, projectSlug, opts) {
   }
 
   const buf = await downloadByFileId(doc.file_id, opts);
+
+  if (buf.length < 100) {
+    return { saved: 0, skipped: 1, reason: `файл слишком маленький (${buf.length} байт)` };
+  }
+
   const dir = ensureInbox(projectSlug);
   const outExt = ext === '.jpeg' ? '.jpg' : ext;
   const filename = uniqueFilename() + outExt;

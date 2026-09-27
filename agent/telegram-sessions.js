@@ -50,10 +50,12 @@ export function clearProject(chatId) {
 }
 
 /**
- * Список проектов на диске (сканирует projects/).
+ * Список проектов на диске (сканирует projects/ или $PROJECTS_ROOT).
  */
 export function listProjects() {
-  const root = path.resolve(new URL('../projects/', import.meta.url).pathname);
+  const root = process.env.PROJECTS_ROOT
+    ? path.resolve(process.env.PROJECTS_ROOT)
+    : path.resolve(new URL('../projects/', import.meta.url).pathname);
   if (!fs.existsSync(root)) return [];
   return fs.readdirSync(root).filter(d => {
     try {

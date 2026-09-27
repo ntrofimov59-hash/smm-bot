@@ -74,8 +74,23 @@ export async function downloadFile(filePath, { fetchImpl = fetch } = {}) {
   const url = `${API_BASE}/file/bot${t}/${filePath}`;
   const res = await fetchImpl(url);
   if (!res.ok) throw new Error(`telegram-api downloadFile: HTTP ${res.status}`);
+
+  // Проверяем Content-Type — если Telegram вернул HTML/JSON, значит ссылка
+  // протухла или file_path неверный. Иначе сохраним мусор с расширением .jpg
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase();
+  if (contentType && !contentType.startsWith('image/') && !contentType.startsWith('application/octet-stream')) {
+    throw new Error(`telegram-api downloadFile: unexpected content-type "${contentType}"`);
+  }
+
   const arrayBuf = await res.arrayBuffer();
-  return Buffer.from(arrayBuf);
+  const buf = Buffer.from(arrayBuf);
+
+  // Sanity-check размера
+  if (buf.length === 0) {
+    throw new Error('telegram-api downloadFile: пустой ответ');
+  }
+
+  return buf;
 }
 
 /**
