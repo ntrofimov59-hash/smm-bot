@@ -162,6 +162,29 @@ export function buildSearchQueries(project, cityKey, { limit = 10 } = {}) {
 /**
  * Сброс ротации (для тестов / ручного вмешательства).
  */
+
+/**
+ * Подбирает локацию, ориентируясь на теги vision (beach/nature/city/...).
+ * Если ни один тег не совпал с type локации — возвращает любую по ротации.
+ *
+ * @param {Object} project
+ * @param {string} cityKey
+ * @param {string[]} visionTags
+ * @returns {{name, hashtag, type}|null}
+ */
+export function pickLandmarkForVision(project, cityKey, visionTags = []) {
+  const city = getCity(project, cityKey);
+  if (!city?.landmarks?.length) return null;
+
+  for (const tag of visionTags) {
+    const hasType = city.landmarks.some(l => l.type === tag);
+    if (hasType) {
+      return pickLandmark(project, cityKey, { type: tag });
+    }
+  }
+  return pickLandmark(project, cityKey);
+}
+
 export function resetRotation() {
   saveRotation({});
 }

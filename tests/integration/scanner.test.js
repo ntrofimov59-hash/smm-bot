@@ -281,3 +281,47 @@ describe('scanner.scanProject — missing accounts.json', () => {
     expect(r).toEqual({ scanned: 0, processed: 0, failed: 0, scheduled: 0 });
   });
 });
+
+describe('scanner — landmark integration', () => {
+  beforeEach(() => {
+    // расширяем PROJECT: добавляем cities с локацией под 'beach'
+    const p = JSON.parse(fs.readFileSync(path.join(tmpProjectDir, 'project.json'), 'utf8'));
+    p.cities = {
+      phuket: {
+        displayName: 'Phuket',
+        country: 'Thailand',
+        tags: ['beach'],
+        hashtags: ['#phuket'],
+        landmarks: [
+          { name: 'Patong Beach', hashtag: '#patongbeach', type: 'beach' },
+        ],
+        nearby: ['Phi Phi'],
+        searchQueries: ['phuket beach'],
+      },
+    };
+    fs.writeFileSync(path.join(tmpProjectDir, 'project.json'), JSON.stringify(p));
+  });
+
+  it('passes location to caption and landmark hashtag to queue', async () => {
+    writeInbox('photo.jpg');
+    await scanner.scanProject(tmpProjectDir);
+
+    const q = JSON.parse(fs.readFileSync(path.join(tmpDataDir, 'queue.json'), 'utf8'));
+    const item = q.items[0];
+
+    // hashtags содержат landmark-хештег
+    expect(item.hashtags).toContain('#patongbeach');
+
+    // caption был вызван с locationContext
+    const captionArgs = mockGenerateCaption.mock.calls[0][0];
+    expect(captionArgs.locationContext).toContain('Patong Beach');
+    expect(captionArgs.locationContext).toContain('Phuket');
+  });
+
+  it('dry-run тоже применяет локацию', async () => {
+    writeInbox('photo.jpg');
+    await scanner.scanProject(tmpProjectDir, { dryRun: true });
+    const captionArgs = mockGenerateCaption.mock.calls[0][0];
+    expect(captionArgs.locationContext).toContain('Patong Beach');
+  });
+});

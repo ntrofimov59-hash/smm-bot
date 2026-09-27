@@ -168,3 +168,33 @@ describe('locations.resetRotation', () => {
     expect(after).toBe(first);
   });
 });
+
+describe('locations.pickLandmarkForVision', () => {
+  it('picks landmark matching vision tag type', () => {
+    const l = loc.pickLandmarkForVision(project, 'phuket', ['beach', 'sunset']);
+    expect(l.type).toBe('beach');
+  });
+
+  it('picks culture landmark when vision says culture', () => {
+    const l = loc.pickLandmarkForVision(project, 'phuket', ['culture']);
+    expect(l.name).toBe('Old Town');
+  });
+
+  it('falls back to any landmark when no type matches', () => {
+    const l = loc.pickLandmarkForVision(project, 'phuket', ['unicorn', 'rainbow']);
+    expect(l).not.toBeNull();
+  });
+
+  it('returns null for city without landmarks', () => {
+    expect(loc.pickLandmarkForVision(project, 'empty', ['beach'])).toBeNull();
+  });
+
+  it('returns null for unknown city', () => {
+    expect(loc.pickLandmarkForVision(project, 'nowhere', ['beach'])).toBeNull();
+  });
+
+  it('uses empty tags gracefully', () => {
+    const l = loc.pickLandmarkForVision(project, 'phuket', []);
+    expect(l).not.toBeNull();
+  });
+});

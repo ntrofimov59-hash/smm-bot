@@ -149,3 +149,56 @@ describe('caption.generateCaption — limits and errors', () => {
     expect(r.caption).toMatch(/Ստեղծում/);
   });
 });
+
+describe('caption.generateCaption — locationContext', () => {
+  it('includes location in user prompt when provided', async () => {
+    let captured;
+    mockCreate.mockImplementationOnce(async (args) => {
+      captured = args;
+      return {
+        choices: [{ message: { content: 'CAPTION:\ntext\n\nHASHTAGS:\n#a' } }],
+        usage: { total_tokens: 10 },
+      };
+    });
+
+    await caption.generateCaption({
+      project,
+      description: 'beach',
+      locationContext: 'Patong Beach, Phuket, Thailand.',
+    });
+
+    const userMsg = captured.messages.find(m => m.role === 'user').content;
+    expect(userMsg).toContain('Patong Beach');
+    expect(userMsg).toContain('Локация:');
+  });
+
+  it('does not include location line when not provided', async () => {
+    let captured;
+    mockCreate.mockImplementationOnce(async (args) => {
+      captured = args;
+      return {
+        choices: [{ message: { content: 'CAPTION:\ntext\n\nHASHTAGS:\n#a' } }],
+        usage: { total_tokens: 10 },
+      };
+    });
+
+    await caption.generateCaption({ project, description: 'x' });
+    const userMsg = captured.messages.find(m => m.role === 'user').content;
+    expect(userMsg).not.toContain('Локация:');
+  });
+
+  it('system prompt mentions location rule', async () => {
+    let captured;
+    mockCreate.mockImplementationOnce(async (args) => {
+      captured = args;
+      return {
+        choices: [{ message: { content: 'CAPTION:\ntext\n\nHASHTAGS:\n#a' } }],
+        usage: { total_tokens: 10 },
+      };
+    });
+
+    await caption.generateCaption({ project });
+    const sysMsg = captured.messages.find(m => m.role === 'system').content;
+    expect(sysMsg).toContain('Локация');
+  });
+});

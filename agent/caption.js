@@ -23,6 +23,7 @@ export async function generateCaption(opts) {
     project,
     lang = 'ru',
     service = null,
+    locationContext = '',
   } = opts;
 
   const can = usage.canCallGroq(1500);
@@ -61,6 +62,7 @@ HASHTAGS:
 #phuketwedding #beachwedding #sunsetvibes #destinationwedding #coucouevents
 
 ПРАВИЛА:
+- Если передана "Локация" — упомяни её название естественно в тексте, но НЕ выдумывай факты про неё.
 - НЕ выдумывай факты. Если на фото пляж — о пляже.
 - НЕ упоминай цены.
 - Обращайся на «вы» (ru/hy) или нейтрально (en).`;
@@ -69,7 +71,8 @@ HASHTAGS:
 Настроение: ${mood || 'не указано'}
 Темы: ${topics.join(', ') || 'нет'}
 ${city ? `Город: ${city}` : ''}
-${service ? `Услуга: ${service}` : ''}`;
+${service ? `Услуга: ${service}` : ''}
+${locationContext ? `Локация: ${locationContext}` : ''}`.trim();
 
   try {
     const resp = await getGroq().chat.completions.create({

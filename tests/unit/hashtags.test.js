@@ -119,3 +119,39 @@ describe('hashtags.resetRotation', () => {
     expect(r).toContain('#phuket');
   });
 });
+
+describe('hashtags.buildHashtags — landmarkHashtag', () => {
+  it('includes landmark hashtag', () => {
+    const r = buildHashtags({ project, city: 'phuket', landmarkHashtag: '#patongbeach' });
+    expect(r).toContain('#patongbeach');
+  });
+
+  it('deduplicates landmark against existing', () => {
+    const r = buildHashtags({
+      project,
+      llmHashtags: ['#patongbeach'],
+      landmarkHashtag: '#patongbeach',
+    });
+    const count = r.filter(t => t === '#patongbeach').length;
+    expect(count).toBe(1);
+  });
+
+  it('ignores null landmarkHashtag', () => {
+    expect(() => buildHashtags({ project, landmarkHashtag: null })).not.toThrow();
+  });
+
+  it('landmark priority between city and llm', () => {
+    const r = buildHashtags({
+      project,
+      city: 'phuket',
+      landmarkHashtag: '#patongbeach',
+      llmHashtags: ['#fromllm'],
+      max: 20,
+    });
+    const idxLandmark = r.indexOf('#patongbeach');
+    const idxLlm = r.indexOf('#fromllm');
+    const idxBase = r.indexOf('#coucou');
+    expect(idxBase).toBeLessThan(idxLandmark);
+    expect(idxLandmark).toBeLessThan(idxLlm);
+  });
+});
