@@ -123,6 +123,8 @@ LIMIT_POSTS_DAY=20
 
 - **Timezone bug in planner** — `scheduleNext` возвращал 15:00 UTC для `11:00 Yerevan` вместо 07:00 UTC. Знак offset был перевёрнут. Поймано unit-тестом на контракт (`getUTCHours() === 7`). См. `tests/unit/planner.test.js`, коммит `a9aae5d`.
 
+- **Pinterest pin id — regex невозможен** — тест ожидал `sourceId = '123456789'`, но CDN-URL не содержит pin id (только hash). Pin id живёт в `<a href="/pin/.../">` отдельно от `<img>`. Фикс: убрали неверную функциональность, задокументировали ограничение, запланировали парсинг `__PWS_DATA__`. См. `tests/unit/sources-pinterest.test.js`.
+
 - **Caption parser override** — при пустом `CAPTION:` от LLM парсер подменял его текстом `"CAPTION:\nHASHTAGS:"` через fallback «весь текст — caption». Main-код считал caption непустым и не применял `fallbackCaption`, публикуя мусор. Фикс: если секции найдены — доверяем им полностью. Поймано тестом на контракт. См. `tests/unit/caption.test.js`.
 
 ### CI
