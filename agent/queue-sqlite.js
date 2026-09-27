@@ -222,3 +222,46 @@ export function cleanupOld({ daysToKeep = 30 } = {}) {
   }
   return info.changes;
 }
+
+/**
+ * Импортирует запись с сохранением id (для миграции JSON → SQLite).
+ * Идемпотентно: если id уже есть — пропускает.
+ * @returns {boolean} true если вставлено, false если пропущено
+ */
+export function importItem(item) {
+  const db = getDb();
+  const existing = db.prepare('SELECT 1 FROM items WHERE id = ?').get(item.id);
+  if (existing) return false;
+
+  db.prepare(`
+    INSERT INTO items (
+      id, status, created_at, scheduled_at,
+      project_slug, project_path, image_path, image_url,
+      accounts_json, caption, hashtags_json, vision_tags_json,
+      attempts, last_error, published_at, published_post_ids_json
+    ) VALUES (
+      @id, @status, @createdAt, @scheduledAt,
+      @projectSlug, @projectPath, @imagePath, @imageUrl,
+      @accountsJson, @caption, @hashtagsJson, @visionTagsJson,
+      @attempts, @lastError, @publishedAt, @ppidsJson
+    )
+  `).run({
+    id: item.id,
+    status: item.status || 'pending',
+    createdAt: item.createdAt || new Date().toISOString(),
+    scheduledAt: item.scheduledAt,
+    projectSlug: item.projectSlug || null,
+    projectPath: item.projectPath || null,
+    imagePath: item.imagePath || null,
+    imageUrl: item.imageUrl || null,
+    accountsJson: JSON.stringify(item.accounts || []),
+    caption: item.caption || null,
+    hashtagsJson: JSON.stringify(item.hashtags || []),
+    visionTagsJson: JSON.stringify(item.visionTags || []),
+    attempts: item.attempts || 0,
+    lastError: item.lastError || null,
+    publishedAt: item.publishedAt || null,
+    ppidsJson: JSON.stringify(item.publishedPostIds || []),
+  });
+  return true;
+}

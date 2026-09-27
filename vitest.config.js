@@ -17,6 +17,8 @@ export default defineConfig({
         'agent/hashtags.js',
         'agent/usage.js',
         'agent/queue.js',
+        'agent/queue-json.js',
+        'agent/queue-migrate.js',
         'agent/queue-sqlite.js',
         'agent/telegram.js',
         'agent/vision-cache.js',

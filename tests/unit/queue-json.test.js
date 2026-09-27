@@ -10,7 +10,7 @@ beforeEach(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'queue-'));
   vi.stubEnv('SMM_DATA_DIR', tmpDir);
   vi.resetModules();
-  q = await import('../../agent/queue.js');
+  q = await import('../../agent/queue-json.js');
 });
 
 afterEach(() => {

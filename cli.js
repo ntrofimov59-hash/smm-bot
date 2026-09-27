@@ -6,6 +6,7 @@ import { scanAllProjects } from './agent/scanner.js';
 import * as queue from './agent/queue.js';
 import * as usage from './agent/usage.js';
 import * as sources from './agent/sources/index.js';
+import { getQueueInfo, migrateJsonToSqlite } from './agent/queue-migrate.js';
 
 const cmd = process.argv[2] || 'help';
 
@@ -160,6 +161,33 @@ async function main() {
       break;
     }
 
+    case 'queue': {
+      const sub = process.argv[3] || 'info';
+      if (sub === 'info') {
+        const info = getQueueInfo();
+        console.log(`🗄  Backend: ${info.backend}`);
+        console.log(`   Path:    ${info.path}`);
+        console.log(`   Exists:  ${info.exists}`);
+        if (info.exists) {
+          console.log(`   Size:    ${(info.sizeBytes / 1024).toFixed(1)} KB`);
+          if (info.count !== null) console.log(`   Items:   ${info.count}`);
+        }
+      } else if (sub === 'migrate') {
+        const deleteOld = process.argv.includes('--delete-old');
+        console.log('📦 Миграция JSON → SQLite...\n');
+        const r = await migrateJsonToSqlite({ deleteOld });
+        console.log(`   Всего:    ${r.total}`);
+        console.log(`   Перенесено: ${r.migrated}`);
+        console.log(`   Пропущено:  ${r.skipped}`);
+        if (r.deletedOld) console.log(`   queue.json → queue.json.migrated`);
+      } else {
+        console.log('Использование:');
+        console.log('  node cli.js queue info');
+        console.log('  node cli.js queue migrate [--delete-old]');
+      }
+      break;
+    }
+
     case 'upcoming': {
       const items = queue.getUpcoming({ limit: 20 });
       console.log(`📅 ${items.length} постов в очереди:\n`);
@@ -193,6 +221,11 @@ async function main() {
   node cli.js scan --dry   — только показать, что будет сделано
   node cli.js upcoming     — ближайшие запланированные посты
   node cli.js publish-now <id> — публиковать немедленно
+
+Очередь:
+  node cli.js queue info              — активный бэкенд и путь
+  node cli.js queue migrate           — перенести JSON → SQLite
+  node cli.js queue migrate --delete-old  — и переименовать старый файл
 
 Fetching:
   node cli.js fetch pinterest <board-url> --project <slug> [--limit N]
