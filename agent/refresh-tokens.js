@@ -2,20 +2,28 @@
 // Cron: раз в неделю, но обновляет только токены старше 45 дней
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { notify } from './telegram.js';
 
-const PROJECTS_DIR = path.resolve(new URL('../projects/', import.meta.url).pathname);
+function getProjectsDir() {
+  if (process.env.PROJECTS_DIR) return path.resolve(process.env.PROJECTS_DIR);
+  return path.resolve(new URL('../projects/', import.meta.url).pathname);
+}
 
-// Обновляем, если токен не обновлялся более 45 дней
-const REFRESH_AFTER_DAYS = 45;
+function getRefreshAfterDays() {
+  return Number(process.env.REFRESH_AFTER_DAYS) || 45;
+}
 
-async function refreshToken(token) {
+async function refreshToken(token, fetchImpl = fetch) {
   const url = `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${token}`;
-  const res = await fetch(url);
+  const res = await fetchImpl(url);
   return res.json();
 }
 
-async function refreshProject(projectPath, projectSlug) {
+export async function refreshProject(projectPath, projectSlug, opts = {}) {
+  const { fetchImpl = fetch, skipDelay = false } = opts;
+  const REFRESH_AFTER_DAYS = getRefreshAfterDays();
+
   const accountsPath = path.join(projectPath, 'accounts.json');
   if (!fs.existsSync(accountsPath)) return null;
 
@@ -31,13 +39,11 @@ async function refreshProject(projectPath, projectSlug) {
     const account = cfg.instagram[i];
     const username = account.username;
 
-    // Пропускаем неактивные/placeholder
     if (!account.active || !account.accessToken || account.accessToken.length < 50) {
       console.log(`⏭  @${username} — неактив или нет токена`);
       continue;
     }
 
-    // Проверяем, надо ли обновлять
     if (account.refreshedAt) {
       const daysSince = (Date.now() - new Date(account.refreshedAt).getTime()) / 86400000;
       if (daysSince < REFRESH_AFTER_DAYS) {
@@ -48,7 +54,7 @@ async function refreshProject(projectPath, projectSlug) {
 
     console.log(`🔄 @${username}`);
     try {
-      const data = await refreshToken(account.accessToken);
+      const data = await refreshToken(account.accessToken, fetchImpl);
 
       if (data.error) {
         console.error(`  ❌ ${data.error.message}`);
@@ -75,7 +81,9 @@ async function refreshProject(projectPath, projectSlug) {
       results.push({ username, ok: false, error: e.message });
     }
 
-    await new Promise(r => setTimeout(r, 1000));
+    if (!skipDelay) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 
   if (updated) {
@@ -88,13 +96,16 @@ async function refreshProject(projectPath, projectSlug) {
   return results;
 }
 
-async function main() {
+export async function main(opts = {}) {
+  const { fetchImpl = fetch, skipDelay = false, notifyImpl = notify } = opts;
+  const PROJECTS_DIR = getProjectsDir();
+
   console.log('🔐 Автообновление Instagram токенов');
   console.log(`   ${new Date().toISOString()}\n`);
 
   if (!fs.existsSync(PROJECTS_DIR)) {
     console.error('❌ Нет папки projects/');
-    process.exit(1);
+    return { total: 0, ok: 0, failed: 0, skipped: 0, projectsFound: false };
   }
 
   const projects = fs.readdirSync(PROJECTS_DIR).filter(d => {
@@ -102,12 +113,15 @@ async function main() {
     catch { return false; }
   });
 
-  const summary = { total: 0, ok: 0, failed: 0, skipped: 0 };
+  const summary = { total: 0, ok: 0, failed: 0, skipped: 0, projectsFound: true };
   const errors = [];
   let updatedCount = 0;
 
   for (const slug of projects) {
-    const results = await refreshProject(path.join(PROJECTS_DIR, slug), slug);
+    const results = await refreshProject(
+      path.join(PROJECTS_DIR, slug), slug,
+      { fetchImpl, skipDelay },
+    );
     if (!results) continue;
 
     for (const r of results) {
@@ -117,7 +131,6 @@ async function main() {
     }
   }
 
-  // Отчёт в Telegram — только если что-то обновляли или были ошибки
   if (updatedCount > 0 || summary.failed > 0) {
     const emoji = summary.failed === 0 ? '✅' : '⚠️';
     const msg = `${emoji} <b>Обновление Instagram токенов</b>
@@ -127,7 +140,7 @@ async function main() {
 
 ${errors.length ? `⚠️ <b>Проблемы:</b>\n${errors.join('\n')}` : ''}`;
 
-    await notify(msg);
+    await notifyImpl(msg);
     console.log('\n📬 Отчёт отправлен в Telegram');
   } else {
     console.log('\nℹ️  Ничего не обновлялось, отчёт не отправляю');
@@ -135,10 +148,16 @@ ${errors.length ? `⚠️ <b>Проблемы:</b>\n${errors.join('\n')}` : ''}`
 
   console.log(`\n=== ИТОГИ ===`);
   console.log(`Обновлено: ${summary.ok}, Ошибок: ${summary.failed}`);
+
+  return summary;
 }
 
-main().catch(e => {
-  console.error('FATAL:', e);
-  notify(`❌ Ошибка автообновления токенов: ${e.message}`).catch(() => {});
-  process.exit(1);
-});
+// Запускаем только при прямом вызове (node agent/refresh-tokens.js)
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  main().catch(e => {
+    console.error('FATAL:', e);
+    notify(`❌ Ошибка автообновления токенов: ${e.message}`).catch(() => {});
+    process.exit(1);
+  });
+}
