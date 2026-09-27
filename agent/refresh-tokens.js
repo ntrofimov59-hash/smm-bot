@@ -21,7 +21,7 @@ async function refreshToken(token, fetchImpl = fetch) {
 }
 
 export async function refreshProject(projectPath, projectSlug, opts = {}) {
-  const { fetchImpl = fetch, skipDelay = false } = opts;
+  const { fetchImpl = fetch, skipDelay = false, force = false } = opts;
   const REFRESH_AFTER_DAYS = getRefreshAfterDays();
 
   const accountsPath = path.join(projectPath, 'accounts.json');
@@ -44,15 +44,20 @@ export async function refreshProject(projectPath, projectSlug, opts = {}) {
       continue;
     }
 
-    if (account.refreshedAt) {
+    if (!force && account.refreshedAt) {
       const daysSince = (Date.now() - new Date(account.refreshedAt).getTime()) / 86400000;
       if (daysSince < REFRESH_AFTER_DAYS) {
         console.log(`⏭  @${username} — обновлён ${Math.round(daysSince)} дн. назад, пропускаю`);
         continue;
       }
     }
+    if (force && account.refreshedAt) {
+      const daysSince = (Date.now() - new Date(account.refreshedAt).getTime()) / 86400000;
+      console.log(`🔁 @${username} — force refresh (было ${Math.round(daysSince)} дн. назад)`);
+    } else {
+      console.log(`🔄 @${username}`);
+    }
 
-    console.log(`🔄 @${username}`);
     try {
       const data = await refreshToken(account.accessToken, fetchImpl);
 
@@ -97,7 +102,7 @@ export async function refreshProject(projectPath, projectSlug, opts = {}) {
 }
 
 export async function main(opts = {}) {
-  const { fetchImpl = fetch, skipDelay = false, notifyImpl = notify } = opts;
+  const { fetchImpl = fetch, skipDelay = false, notifyImpl = notify, force = false } = opts;
   const PROJECTS_DIR = getProjectsDir();
 
   console.log('🔐 Автообновление Instagram токенов');
@@ -120,7 +125,7 @@ export async function main(opts = {}) {
   for (const slug of projects) {
     const results = await refreshProject(
       path.join(PROJECTS_DIR, slug), slug,
-      { fetchImpl, skipDelay },
+      { fetchImpl, skipDelay, force },
     );
     if (!results) continue;
 
@@ -155,7 +160,8 @@ ${errors.length ? `⚠️ <b>Проблемы:</b>\n${errors.join('\n')}` : ''}`
 // Запускаем только при прямом вызове (node agent/refresh-tokens.js)
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
-  main().catch(e => {
+  const force = process.argv.includes('--force');
+  main({ force }).catch(e => {
     console.error('FATAL:', e);
     notify(`❌ Ошибка автообновления токенов: ${e.message}`).catch(() => {});
     process.exit(1);

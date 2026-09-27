@@ -15,7 +15,8 @@
     "test:cov": "VITEST_COVERAGE=1 vitest run --coverage",
     "prepare": "husky",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "refresh-tokens:force": "node agent/refresh-tokens.js --force"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",
