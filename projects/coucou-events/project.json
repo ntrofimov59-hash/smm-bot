@@ -146,5 +146,152 @@
     "provider": "groq",
     "model": "openai/gpt-oss-120b",
     "maxSentences": 3
+  },
+  "cities": {
+    "phuket": {
+      "displayName": "Phuket",
+      "country": "Thailand",
+      "tags": [
+        "beach",
+        "tropical",
+        "ocean",
+        "sunset",
+        "nature"
+      ],
+      "hashtags": [
+        "#phuket",
+        "#thailand",
+        "#phuketevents",
+        "#phuketwedding",
+        "#beachwedding"
+      ],
+      "landmarks": [
+        {
+          "name": "Patong Beach",
+          "hashtag": "#patongbeach",
+          "type": "beach"
+        },
+        {
+          "name": "Kata Beach",
+          "hashtag": "#katabeach",
+          "type": "beach"
+        },
+        {
+          "name": "Big Buddha",
+          "hashtag": "#bigbuddhaphuket",
+          "type": "landmark"
+        },
+        {
+          "name": "Phuket Old Town",
+          "hashtag": "#phuketoldtown",
+          "type": "culture"
+        }
+      ],
+      "nearby": [
+        "Phi Phi Islands",
+        "Phang Nga Bay",
+        "Krabi"
+      ],
+      "searchQueries": [
+        "phuket beach sunset",
+        "phuket tropical island",
+        "phuket resort"
+      ]
+    },
+    "marrakech": {
+      "displayName": "Marrakech",
+      "country": "Morocco",
+      "tags": [
+        "city",
+        "architecture",
+        "desert",
+        "morocco",
+        "culture",
+        "sunset"
+      ],
+      "hashtags": [
+        "#marrakech",
+        "#morocco",
+        "#marrakechevents",
+        "#desertwedding",
+        "#riad"
+      ],
+      "landmarks": [
+        {
+          "name": "Jemaa el-Fnaa",
+          "hashtag": "#jemaaelfnaa",
+          "type": "culture"
+        },
+        {
+          "name": "Majorelle Garden",
+          "hashtag": "#jardinmajorelle",
+          "type": "nature"
+        },
+        {
+          "name": "Medina",
+          "hashtag": "#marrakechmedina",
+          "type": "culture"
+        },
+        {
+          "name": "Agafay Desert",
+          "hashtag": "#agafaydesert",
+          "type": "desert"
+        }
+      ],
+      "nearby": [
+        "Atlas Mountains",
+        "Essaouira",
+        "Agafay"
+      ],
+      "searchQueries": [
+        "marrakech riad sunset",
+        "marrakech medina",
+        "agafay desert camp"
+      ]
+    },
+    "nanchang": {
+      "displayName": "Nanchang",
+      "country": "China",
+      "tags": [
+        "city",
+        "architecture",
+        "culture",
+        "china",
+        "nature"
+      ],
+      "hashtags": [
+        "#nanchang",
+        "#china",
+        "#nanchangevents",
+        "#jiangxi"
+      ],
+      "landmarks": [
+        {
+          "name": "Tengwang Pavilion",
+          "hashtag": "#tengwangpavilion",
+          "type": "culture"
+        },
+        {
+          "name": "Poyang Lake",
+          "hashtag": "#poyanglake",
+          "type": "nature"
+        },
+        {
+          "name": "Star of Nanchang",
+          "hashtag": "#starnanchang",
+          "type": "city"
+        }
+      ],
+      "nearby": [
+        "Lushan",
+        "Poyang Lake",
+        "Jingdezhen"
+      ],
+      "searchQueries": [
+        "nanchang city",
+        "poyang lake",
+        "jiangxi nature"
+      ]
+    }
   }
 }

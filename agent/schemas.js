@@ -3,6 +3,22 @@ import { z } from 'zod';
 
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+export const LandmarkSchema = z.object({
+  name: z.string().min(1),
+  hashtag: z.string().startsWith('#'),
+  type: z.string().optional(),
+}).passthrough();
+
+export const CitySchema = z.object({
+  displayName: z.string().min(1),
+  country: z.string().optional(),
+  tags: z.array(z.string()).default([]),
+  hashtags: z.array(z.string().startsWith('#')).default([]),
+  landmarks: z.array(LandmarkSchema).default([]),
+  nearby: z.array(z.string()).default([]),
+  searchQueries: z.array(z.string()).default([]),
+}).passthrough();
+
 export const ProjectSchema = z.object({
   slug: z.string().min(1).regex(/^[a-z0-9][a-z0-9-]*$/, {
     message: 'slug: только a-z, 0-9, дефис; начинается с буквы/цифры',
@@ -30,6 +46,8 @@ export const ProjectSchema = z.object({
     minHoursBetweenPosts: z.number().positive().default(4),
     maxHashtags: z.number().int().min(1).max(30).default(12),
   }),
+
+  cities: z.record(z.string(), CitySchema).default({}),
 
   hashtags: z.object({
     base: z.array(z.string().startsWith('#')).default([]),

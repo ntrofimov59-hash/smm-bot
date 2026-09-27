@@ -147,3 +147,61 @@ describe('AccountsSchema', () => {
     expect(r.success).toBe(false);
   });
 });
+
+describe('ProjectSchema — cities', () => {
+  it('accepts project without cities (default {})', () => {
+    const r = ProjectSchema.safeParse({
+      slug: 'a', timezone: 'UTC', publishing: { bestHours: ['10:00'] },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.cities).toEqual({});
+  });
+
+  it('accepts project with rich city object', () => {
+    const r = ProjectSchema.safeParse({
+      slug: 'a', timezone: 'UTC', publishing: { bestHours: ['10:00'] },
+      cities: {
+        phuket: {
+          displayName: 'Phuket',
+          country: 'Thailand',
+          tags: ['beach'],
+          hashtags: ['#phuket'],
+          landmarks: [{ name: 'Patong Beach', hashtag: '#patong', type: 'beach' }],
+          nearby: ['Phi Phi'],
+          searchQueries: ['phuket beach'],
+        },
+      },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.cities.phuket.landmarks).toHaveLength(1);
+      expect(r.data.cities.phuket.displayName).toBe('Phuket');
+    }
+  });
+
+  it('rejects landmark without hashtag prefix', () => {
+    const r = ProjectSchema.safeParse({
+      slug: 'a', timezone: 'UTC', publishing: { bestHours: ['10:00'] },
+      cities: {
+        x: {
+          displayName: 'X',
+          landmarks: [{ name: 'Place', hashtag: 'no-hash' }],
+        },
+      },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('applies defaults for missing arrays', () => {
+    const r = ProjectSchema.safeParse({
+      slug: 'a', timezone: 'UTC', publishing: { bestHours: ['10:00'] },
+      cities: { x: { displayName: 'X' } },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.cities.x.tags).toEqual([]);
+      expect(r.data.cities.x.landmarks).toEqual([]);
+      expect(r.data.cities.x.nearby).toEqual([]);
+    }
+  });
+});
