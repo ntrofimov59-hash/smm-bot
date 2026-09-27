@@ -10,9 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      // NOTE: cli.js НЕ включён — e2e тесты запускают его как child_process,
-      // и vitest v8-coverage не инструментирует подпроцессы.
-      // См. README → "Testing" → "Coverage out-of-process".
+      // cli.js НЕ включён — out-of-process (см. README)
       include: [
         'agent/planner.js',
         'agent/matcher.js',
@@ -25,6 +23,8 @@ export default defineConfig({
         'agent/vision.js',
         'agent/publishers/instagram.js',
         'agent/scanner.js',
+        'agent/sources/downloader.js',
+        'agent/sources/pinterest.js',
       ],
       exclude: ['**/node_modules/**', 'tests/**'],
       thresholds: {
