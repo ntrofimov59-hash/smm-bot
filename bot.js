@@ -1,20 +1,23 @@
 // bot.js — главный процесс: сканирует inbox + публикует по расписанию
 import 'dotenv/config';
+import { pathToFileURL } from 'url';
 import cron from 'node-cron';
 import { scanAllProjects } from './agent/scanner.js';
 import { tick as schedulerTick } from './agent/scheduler.js';
 import * as queue from './agent/queue.js';
 import { notify } from './agent/telegram.js';
 
-const SCAN_EVERY_MINUTES = Number(process.env.SCAN_INTERVAL_MIN || 15);
-const SCHEDULER_EVERY_MINUTES = Number(process.env.SCHEDULER_INTERVAL_MIN || 1);
+export async function main() {
+  // Env читаем внутри функции — для тестируемости через vi.stubEnv
+  // Number(x) || default — защита от NaN, если в .env опечатка ('abc')
+  const SCAN_EVERY_MINUTES = Number(process.env.SCAN_INTERVAL_MIN) || 15;
+  const SCHEDULER_EVERY_MINUTES = Number(process.env.SCHEDULER_INTERVAL_MIN) || 1;
 
-async function main() {
   console.log('🤖 SMM Bot запускается...');
   console.log(`   Сканирование inbox: каждые ${SCAN_EVERY_MINUTES} мин`);
   console.log(`   Проверка очереди: каждые ${SCHEDULER_EVERY_MINUTES} мин`);
 
-  // Первый прогон сразу
+  // Первый прогон — не роняем процесс, если упадёт
   try {
     console.log('\n🔍 Первичное сканирование...');
     const r = await scanAllProjects();
@@ -25,29 +28,31 @@ async function main() {
     console.error('Ошибка первичного скана:', e.message);
   }
 
+  const jobs = [];
+
   // Cron: сканирование inbox
-  cron.schedule(`*/${SCAN_EVERY_MINUTES} * * * *`, async () => {
+  jobs.push(cron.schedule(`*/${SCAN_EVERY_MINUTES} * * * *`, async () => {
     try {
       console.log(`\n🔍 [${new Date().toISOString()}] Сканирую inbox...`);
       await scanAllProjects();
     } catch (e) {
       console.error('scan error:', e.message);
     }
-  });
+  }));
 
-  // Cron: публикация (каждую минуту)
-  cron.schedule(`*/${SCHEDULER_EVERY_MINUTES} * * * *`, async () => {
+  // Cron: публикация
+  jobs.push(cron.schedule(`*/${SCHEDULER_EVERY_MINUTES} * * * *`, async () => {
     try {
       await schedulerTick();
     } catch (e) {
       console.error('scheduler error:', e.message);
     }
-  });
+  }));
 
-  // Cron: очистка старых записей раз в день
-  cron.schedule('0 4 * * *', () => {
+  // Cron: очистка старых записей в 4:00
+  jobs.push(cron.schedule('0 4 * * *', () => {
     queue.cleanupOld({ daysToKeep: 30 });
-  });
+  }));
 
   const stats = queue.getStats();
   await notify(`🤖 <b>SMM Bot запущен</b>
@@ -56,9 +61,14 @@ async function main() {
 ⏱ Сканирование: каждые ${SCAN_EVERY_MINUTES} мин`);
 
   console.log('\n✅ SMM Bot запущен');
+  return jobs;
 }
 
-main().catch(e => {
-  console.error('FATAL:', e);
-  process.exit(1);
-});
+// Запускаем только при прямом вызове (node bot.js), не при импорте из тестов
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  main().catch(e => {
+    console.error('FATAL:', e);
+    process.exit(1);
+  });
+}

@@ -14,6 +14,7 @@ export default defineConfig({
       include: [
         'agent/schemas.js',
         'agent/config-loader.js',
+        'bot.js',
         'agent/planner.js',
         'agent/matcher.js',
         'agent/hashtags.js',
