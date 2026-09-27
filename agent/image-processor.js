@@ -1,6 +1,7 @@
 // agent/image-processor.js — единая стилистика + вотермарка для всех фото
 import fs from 'fs';
 import sharp from 'sharp';
+import { applyVariationOnBuffer } from './image-variation.js';
 
 /**
  * Обрабатывает изображение:
@@ -19,6 +20,7 @@ export async function processImage(inputPath, outputPath, settings = {}) {
     filter = { brightness: 1.05, saturation: 1.1, warmth: 0.03 },
     watermark = { enabled: false },
     logo = { enabled: false },
+    variation = { enabled: false, profile: 'subtle' },
   } = settings;
 
   const [W, H] = targetSize;
@@ -28,6 +30,22 @@ export async function processImage(inputPath, outputPath, settings = {}) {
 
   // 2. Квадрат + resize. Стратегия: cover — обрезаем по центру
   img = img.resize(W, H, { fit: 'cover', position: 'attention' });
+
+  // 2.5. Variation — случайный crop/rotate/цвет, чтобы каждое фото было уникальным.
+  // Делается ДО watermark и лого, чтобы они не «плыли».
+  // После variation image становится меньше (crop) + смещённым (rotate),
+  // поэтому догоняем обратно до W×H через resize.
+  let variationMeta = null;
+  if (variation.enabled) {
+    const preBuf = await img.png().toBuffer();
+    const { buffer: variedBuf, meta } = await applyVariationOnBuffer(preBuf, {
+      width: W,
+      height: H,
+      profile: variation.profile || 'subtle',
+    });
+    variationMeta = meta;
+    img = sharp(variedBuf).resize(W, H, { fit: 'cover', position: 'attention' });
+  }
 
   // 3. Фильтр: яркость / насыщенность / тёплый оттенок
   // sharp поддерживает .modulate() для brightness и saturation
@@ -139,6 +157,7 @@ export async function processImage(inputPath, outputPath, settings = {}) {
     width: W,
     height: H,
     sizeKB: Math.round(stat.size / 1024),
+    variation: variationMeta,
   };
 }
 

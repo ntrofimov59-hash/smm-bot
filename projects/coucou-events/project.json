@@ -121,7 +121,11 @@
     "targetSize": [
       1080,
       1080
-    ]
+    ],
+    "variation": {
+      "enabled": true,
+      "profile": "subtle"
+    }
   },
   "vision": {
     "enabled": true,

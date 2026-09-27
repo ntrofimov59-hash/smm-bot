@@ -60,6 +60,10 @@ export const ProjectSchema = z.object({
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
     quality: z.number().int().min(1).max(100).optional(),
+    variation: z.object({
+      enabled: z.boolean().default(false),
+      profile: z.enum(['subtle', 'medium', 'strong']).default('subtle'),
+    }).default({ enabled: false, profile: 'subtle' }),
   }).passthrough().optional(),
 }).passthrough();
 
