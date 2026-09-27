@@ -1,13 +1,8 @@
 // agent/planner.js — выбирает оптимальное время публикации
-// Исправлена работа с timezone (используем правильный offset через Intl)
+// Исправлена работа с timezone (через Intl.formatToParts, независимо от локали сервера)
 
 /**
  * Находит следующее свободное время для публикации.
- * @param {Object} opts
- * @param {Object} opts.project — project.json (publishing: {bestHours, postsPerDay})
- * @param {string} opts.timezone — IANA timezone (Asia/Yerevan)
- * @param {Array} opts.existing — уже занятые timestamp'ы (числа или ISO-строки)
- * @returns {Date}
  */
 export function scheduleNext({ project, timezone = 'UTC', existing = [] } = {}) {
   const bestHours = project?.publishing?.bestHours || ['11:00', '19:00'];
@@ -16,10 +11,8 @@ export function scheduleNext({ project, timezone = 'UTC', existing = [] } = {}) 
 
   const existingMs = existing.map(t => typeof t === 'number' ? t : new Date(t).getTime());
 
-  // Начинаем с "сейчас + 15 минут"
   const start = new Date(Date.now() + 15 * 60 * 1000);
 
-  // Ищем в течение 14 дней
   for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
     const baseDate = new Date(start);
     baseDate.setUTCDate(baseDate.getUTCDate() + dayOffset);
@@ -27,13 +20,10 @@ export function scheduleNext({ project, timezone = 'UTC', existing = [] } = {}) 
     for (const hhmm of bestHours) {
       const [h, m] = hhmm.split(':').map(Number);
 
-      // Создаём кандидата в нужном timezone
       const candidate = createDateInTimezone(baseDate, h, m, timezone);
 
-      // Если в прошлом — пропускаем
       if (candidate.getTime() <= Date.now() + 5 * 60 * 1000) continue;
 
-      // Проверяем минимальный интервал с существующими
       const tooClose = existingMs.some(t => Math.abs(t - candidate.getTime()) < minGapMs);
       if (tooClose) continue;
 
@@ -41,13 +31,11 @@ export function scheduleNext({ project, timezone = 'UTC', existing = [] } = {}) 
     }
   }
 
-  // Фолбэк: просто +1 час
   return new Date(Date.now() + 60 * 60 * 1000);
 }
 
 /**
- * Создаёт Date, соответствующий указанному часу:минуте в заданном timezone
- * на дату baseDate (берём год/месяц/день из baseDate).
+ * Создаёт Date, соответствующий hour:minute в timezone на дату baseDate.
  */
 function createDateInTimezone(baseDate, hour, minute, timezone) {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -68,22 +56,48 @@ function createDateInTimezone(baseDate, hour, minute, timezone) {
   const month = Number(get('month'));
   const day = Number(get('day'));
 
+  // Предполагаем, что hour:minute — это wall-clock в timezone.
+  // Строим UTC-время из этих компонентов как "guess".
   const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
 
+  // Считаем реальный offset timezone относительно UTC для этого момента.
   const offsetMs = getTimezoneOffsetMs(timezone, guess);
+
+  // Если offset = +4ч (Yerevan), а мы хотим 11:00 Yerevan,
+  // то нужно UTC = 11 - 4 = 07:00.
   return new Date(guess.getTime() - offsetMs);
 }
 
 /**
- * Возвращает offset timezone в миллисекундах относительно UTC
+ * Возвращает offset timezone относительно UTC в миллисекундах.
+ * Положительный = timezone восточнее UTC (Yerevan +4h, NY -5h).
+ * Не зависит от локали сервера.
  */
 function getTimezoneOffsetMs(timezone, date) {
   try {
-    const utcStr = date.toLocaleString('en-US', { timeZone: 'UTC' });
-    const tzStr = date.toLocaleString('en-US', { timeZone: timezone });
-    const utcDate = new Date(utcStr);
-    const tzDate = new Date(tzStr);
-    return utcDate.getTime() - tzDate.getTime();
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const parts = dtf.formatToParts(date);
+    const get = (t) => parts.find(p => p.type === t)?.value;
+
+    const asUTC = Date.UTC(
+      Number(get('year')),
+      Number(get('month')) - 1,
+      Number(get('day')),
+      Number(get('hour')),
+      Number(get('minute')),
+      Number(get('second')),
+    );
+
+    return asUTC - date.getTime();
   } catch {
     return 0;
   }
