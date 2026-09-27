@@ -29,6 +29,13 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
     return { scanned: 0, processed: 0, failed: 0, scheduled: 0 };
   }
 
+  // accounts.json может отсутствовать в чистом клоне (в .gitignore)
+  // или в проекте, где ещё не настроены аккаунты. Не падаем — пропускаем.
+  if (!fs.existsSync(accountsJsonPath)) {
+    console.warn(`⚠️ Нет accounts.json в ${projectPath} — проект не настроен, пропускаю`);
+    return { scanned: 0, processed: 0, failed: 0, scheduled: 0 };
+  }
+
   const project = JSON.parse(fs.readFileSync(projectJsonPath, 'utf8'));
   const accounts = JSON.parse(fs.readFileSync(accountsJsonPath, 'utf8'));
   const projectSlug = project.slug || path.basename(projectPath);

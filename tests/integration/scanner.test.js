@@ -263,3 +263,21 @@ describe('scanner.scanProject — missing config', () => {
     fs.rmSync(emptyDir, { recursive: true, force: true });
   });
 });
+
+describe('scanner.scanProject — missing accounts.json', () => {
+  it('возвращает нули и не падает, если accounts.json отсутствует', async () => {
+    writeInbox('photo.jpg');
+    fs.unlinkSync(path.join(tmpProjectDir, 'accounts.json'));
+    const r = await scanner.scanProject(tmpProjectDir);
+    expect(r).toEqual({ scanned: 0, processed: 0, failed: 0, scheduled: 0 });
+    // файл остался в inbox
+    expect(fs.existsSync(path.join(tmpProjectDir, 'inbox', 'photo.jpg'))).toBe(true);
+  });
+
+  it('dry-run тоже не падает без accounts.json', async () => {
+    writeInbox('photo.jpg');
+    fs.unlinkSync(path.join(tmpProjectDir, 'accounts.json'));
+    const r = await scanner.scanProject(tmpProjectDir, { dryRun: true });
+    expect(r).toEqual({ scanned: 0, processed: 0, failed: 0, scheduled: 0 });
+  });
+});
