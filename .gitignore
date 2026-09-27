@@ -16,3 +16,4 @@ projects/*/assets/*.png
 projects/*/accounts.json
 .git.backup/
 logs/
+coverage/
