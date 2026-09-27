@@ -1,3 +1,5 @@
+![CI](https://github.com/ntrofimov59-hash/smm-bot/actions/workflows/ci.yml/badge.svg)
+
 # SMM Bot — автоматический менеджер социальных сетей
 
 Мульти-проектный бот для автоматической публикации в Instagram.
