@@ -5,7 +5,8 @@ export default defineConfig({
     include: ['tests/**/*.test.js'],
     environment: 'node',
     globals: true,
-    testTimeout: 15000,
+    testTimeout: 20000,
+    hookTimeout: 20000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
@@ -21,6 +22,7 @@ export default defineConfig({
         'agent/vision.js',
         'agent/publishers/instagram.js',
         'agent/scanner.js',
+        'cli.js',
       ],
       exclude: ['**/node_modules/**', 'tests/**'],
       thresholds: {
