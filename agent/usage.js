@@ -2,35 +2,43 @@
 import fs from 'fs';
 import path from 'path';
 
-const DATA_DIR = path.resolve(new URL('./data/', import.meta.url).pathname);
-fs.mkdirSync(DATA_DIR, { recursive: true });
+const DEFAULT_DATA_DIR = path.resolve(new URL('./data/', import.meta.url).pathname);
 
-const USAGE_FILE = path.join(DATA_DIR, 'usage.json');
+function getDataDir() {
+  return process.env.SMM_DATA_DIR || DEFAULT_DATA_DIR;
+}
 
-// Дефолтные лимиты (можно переопределить в .env)
-const LIMITS = {
-  groq_tokens_day: Number(process.env.LIMIT_GROQ_TOKENS_DAY || 200000),
-  groq_tokens_month: Number(process.env.LIMIT_GROQ_TOKENS_MONTH || 3000000),
-  gemini_requests_day: Number(process.env.LIMIT_GEMINI_REQ_DAY || 1500),
-  gemini_requests_month: Number(process.env.LIMIT_GEMINI_REQ_MONTH || 30000),
-  posts_day: Number(process.env.LIMIT_POSTS_DAY || 20),
-  posts_month: Number(process.env.LIMIT_POSTS_MONTH || 600),
-};
+function getUsageFile() {
+  const dir = getDataDir();
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'usage.json');
+}
+
+function getLimits() {
+  return {
+    groq_tokens_day: Number(process.env.LIMIT_GROQ_TOKENS_DAY || 200000),
+    groq_tokens_month: Number(process.env.LIMIT_GROQ_TOKENS_MONTH || 3000000),
+    gemini_requests_day: Number(process.env.LIMIT_GEMINI_REQ_DAY || 1500),
+    gemini_requests_month: Number(process.env.LIMIT_GEMINI_REQ_MONTH || 30000),
+    posts_day: Number(process.env.LIMIT_POSTS_DAY || 20),
+    posts_month: Number(process.env.LIMIT_POSTS_MONTH || 600),
+  };
+}
 
 function load() {
   try {
-    if (fs.existsSync(USAGE_FILE)) {
-      return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8'));
-    }
+    const file = getUsageFile();
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (e) { console.warn('usage: load failed:', e.message); }
   return { days: {}, months: {} };
 }
 
 function save(data) {
   try {
-    const tmp = USAGE_FILE + '.tmp';
+    const file = getUsageFile();
+    const tmp = file + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-    fs.renameSync(tmp, USAGE_FILE);
+    fs.renameSync(tmp, file);
   } catch (e) { console.error('usage: save failed:', e.message); }
 }
 
@@ -50,8 +58,6 @@ function ensureMonth(data, key) {
   }
   return data.months[key];
 }
-
-// === Публичные функции ===
 
 export function trackGroq(tokens) {
   const d = load();
@@ -88,6 +94,7 @@ export function getStatus() {
   const tk = todayKey(), mk = monthKey();
   const today = ensureDay(d, tk);
   const month = ensureMonth(d, mk);
+  const LIMITS = getLimits();
 
   const pct = (used, limit) => limit > 0 ? Math.round((used / limit) * 100) : 0;
 
@@ -115,24 +122,23 @@ export function getStatus() {
   };
 }
 
-// Проверка, разрешена ли операция с учётом лимитов
 export function canPublishPost() {
   const s = getStatus();
-  if (s.today.posts >= LIMITS.posts_day) return { ok: false, reason: 'posts_day_limit' };
-  if (s.month.posts >= LIMITS.posts_month) return { ok: false, reason: 'posts_month_limit' };
+  if (s.today.posts >= s.limits.posts_day) return { ok: false, reason: 'posts_day_limit' };
+  if (s.month.posts >= s.limits.posts_month) return { ok: false, reason: 'posts_month_limit' };
   return { ok: true };
 }
 
 export function canCallGroq(estimatedTokens = 2000) {
   const s = getStatus();
-  if (s.today.groq_tokens + estimatedTokens > LIMITS.groq_tokens_day) return { ok: false, reason: 'groq_day_limit' };
-  if (s.month.groq_tokens + estimatedTokens > LIMITS.groq_tokens_month) return { ok: false, reason: 'groq_month_limit' };
+  if (s.today.groq_tokens + estimatedTokens > s.limits.groq_tokens_day) return { ok: false, reason: 'groq_day_limit' };
+  if (s.month.groq_tokens + estimatedTokens > s.limits.groq_tokens_month) return { ok: false, reason: 'groq_month_limit' };
   return { ok: true };
 }
 
 export function canCallGemini() {
   const s = getStatus();
-  if (s.today.gemini_requests >= LIMITS.gemini_requests_day) return { ok: false, reason: 'gemini_day_limit' };
-  if (s.month.gemini_requests >= LIMITS.gemini_requests_month) return { ok: false, reason: 'gemini_month_limit' };
+  if (s.today.gemini_requests >= s.limits.gemini_requests_day) return { ok: false, reason: 'gemini_day_limit' };
+  if (s.month.gemini_requests >= s.limits.gemini_requests_month) return { ok: false, reason: 'gemini_month_limit' };
   return { ok: true };
 }
