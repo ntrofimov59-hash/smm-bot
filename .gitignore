@@ -17,3 +17,5 @@ projects/*/accounts.json
 .git.backup/
 logs/
 coverage/
+queue.db*
+queue.json.backup*
