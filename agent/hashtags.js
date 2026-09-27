@@ -40,6 +40,7 @@ export function buildHashtags(opts) {
     service = null,
     imageTags = [],
     llmHashtags = [],
+    landmarkHashtag = null,
     max = 12,
   } = opts;
 
@@ -69,7 +70,13 @@ export function buildHashtags(opts) {
     }
   }
 
-  // 4. Хештеги от LLM
+  // 3.5. Хештег локации (landmark) — ротация, приоритет выше LLM:
+  // конкретное место важнее generic хештегов, но base всегда первые
+  if (landmarkHashtag && !usedSet.has(landmarkHashtag)) {
+    candidates.push({ tag: landmarkHashtag, priority: 2.5 });
+  }
+
+  // 4. Хештеги от LLM — ротация, приоритет выше среднего
   for (const t of llmHashtags) {
     if (!usedSet.has(t)) candidates.push({ tag: t, priority: 2 });
   }

@@ -11,6 +11,7 @@ import { scheduleNext } from './planner.js';
 import * as queue from './queue.js';
 import { notifyScheduled } from './telegram.js';
 import { loadProject, loadAccounts } from './config-loader.js';
+import { pickLandmarkForVision, buildCaptionContext } from './locations.js';
 
 const PUBLIC_MEDIA_DIR = process.env.MEDIA_DIR || '/var/www/smm-media';
 const PUBLIC_MEDIA_URL = process.env.MEDIA_PUBLIC_URL || 'https://smm.coucou-events.com/media';
@@ -89,6 +90,18 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
       console.log(`  → аккаунты: ${matches.map(m => '@' + m.username).join(', ')}`);
 
       const service = inferService(vision.tags);
+      const cityKey = matches[0]?.city || '';
+
+      // Подбираем локацию по тегам vision (beach → пляж, nature → природа, ...)
+      const landmark = cityKey
+        ? pickLandmarkForVision(project, cityKey, vision.tags)
+        : null;
+      const locationContext = landmark
+        ? buildCaptionContext(project, cityKey, { landmark })
+        : '';
+      if (landmark) {
+        console.log(`  → локация: ${landmark.name} ${landmark.hashtag}`);
+      }
 
       console.log('  2/6 caption…');
       const lang = project.languages?.[0] || 'ru';
@@ -96,20 +109,22 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
         description: vision.description,
         topics: vision.suggestedTopics,
         mood: vision.mood,
-        city: matches[0]?.city || '',
+        city: cityKey,
         project,
         lang,
         service,
+        locationContext,
       });
       console.log(`     tokens: ${tokens}`);
 
       console.log('  3/6 hashtags…');
       const finalHashtags = buildHashtags({
         project,
-        city: matches[0]?.city || '',
+        city: cityKey,
         service,
         imageTags: vision.tags,
         llmHashtags,
+        landmarkHashtag: landmark?.hashtag || null,
         max: project.publishing?.maxHashtags || 12,
       });
 
