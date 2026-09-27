@@ -82,6 +82,18 @@
         "#balievents",
         "#baliwedding",
         "#islandwedding"
+      ],
+      "casablanca": [
+        "#casablanca",
+        "#morocco",
+        "#casablancaevents",
+        "#moroccowedding"
+      ],
+      "danang": [
+        "#danang",
+        "#vietnam",
+        "#danangevents",
+        "#vietnamwedding"
       ]
     }
   },
@@ -296,6 +308,214 @@
         "poyang lake",
         "jiangxi nature"
       ]
+    },
+    "yerevan": {
+      "displayName": "Yerevan",
+      "country": "Armenia",
+      "tags": [
+        "city",
+        "architecture",
+        "culture",
+        "mountains",
+        "sunset",
+        "nature"
+      ],
+      "hashtags": [
+        "#yerevan",
+        "#armenia",
+        "#yerevanevents",
+        "#armeniawedding",
+        "#caucasus"
+      ],
+      "landmarks": [
+        {
+          "name": "Cascade Complex",
+          "hashtag": "#cascadeyerevan",
+          "type": "city"
+        },
+        {
+          "name": "Republic Square",
+          "hashtag": "#republicsquare",
+          "type": "city"
+        },
+        {
+          "name": "Ararat View",
+          "hashtag": "#araratview",
+          "type": "mountains"
+        },
+        {
+          "name": "Opera House",
+          "hashtag": "#yerevanopera",
+          "type": "culture"
+        }
+      ],
+      "nearby": [
+        "Lake Sevan",
+        "Garni Temple",
+        "Geghard Monastery",
+        "Dilijan"
+      ],
+      "searchQueries": [
+        "yerevan city sunset",
+        "yerevan cascade",
+        "ararat mountain view"
+      ],
+      "pinterestBoards": []
+    },
+    "casablanca": {
+      "displayName": "Casablanca",
+      "country": "Morocco",
+      "tags": [
+        "city",
+        "architecture",
+        "ocean",
+        "beach",
+        "sunset",
+        "culture"
+      ],
+      "hashtags": [
+        "#casablanca",
+        "#morocco",
+        "#casablancaevents",
+        "#moroccowedding"
+      ],
+      "landmarks": [
+        {
+          "name": "Hassan II Mosque",
+          "hashtag": "#hassanii",
+          "type": "architecture"
+        },
+        {
+          "name": "Corniche",
+          "hashtag": "#casablancacorniche",
+          "type": "ocean"
+        },
+        {
+          "name": "Old Medina",
+          "hashtag": "#casablancamedina",
+          "type": "culture"
+        },
+        {
+          "name": "Ain Diab",
+          "hashtag": "#aindiab",
+          "type": "beach"
+        }
+      ],
+      "nearby": [
+        "Rabat",
+        "Marrakech",
+        "Essaouira"
+      ],
+      "searchQueries": [
+        "casablanca mosque sunset",
+        "casablanca corniche ocean",
+        "casablanca city"
+      ],
+      "pinterestBoards": []
+    },
+    "bali": {
+      "displayName": "Bali",
+      "country": "Indonesia",
+      "tags": [
+        "beach",
+        "tropical",
+        "ocean",
+        "nature",
+        "sunset",
+        "temple"
+      ],
+      "hashtags": [
+        "#bali",
+        "#indonesia",
+        "#balievents",
+        "#baliwedding",
+        "#islandwedding"
+      ],
+      "landmarks": [
+        {
+          "name": "Tanah Lot Temple",
+          "hashtag": "#tanahlot",
+          "type": "temple"
+        },
+        {
+          "name": "Uluwatu Temple",
+          "hashtag": "#uluwatu",
+          "type": "temple"
+        },
+        {
+          "name": "Ubud Rice Terraces",
+          "hashtag": "#ubud",
+          "type": "nature"
+        },
+        {
+          "name": "Seminyak Beach",
+          "hashtag": "#seminyak",
+          "type": "beach"
+        }
+      ],
+      "nearby": [
+        "Nusa Penida",
+        "Gili Islands",
+        "Lombok"
+      ],
+      "searchQueries": [
+        "bali temple sunset",
+        "bali rice terrace",
+        "bali beach tropical"
+      ],
+      "pinterestBoards": []
+    },
+    "danang": {
+      "displayName": "Da Nang",
+      "country": "Vietnam",
+      "tags": [
+        "beach",
+        "tropical",
+        "ocean",
+        "bridge",
+        "city",
+        "sunset",
+        "nature"
+      ],
+      "hashtags": [
+        "#danang",
+        "#vietnam",
+        "#danangevents",
+        "#vietnamwedding"
+      ],
+      "landmarks": [
+        {
+          "name": "Golden Bridge",
+          "hashtag": "#goldenbridge",
+          "type": "bridge"
+        },
+        {
+          "name": "Dragon Bridge",
+          "hashtag": "#dragonbridge",
+          "type": "bridge"
+        },
+        {
+          "name": "My Khe Beach",
+          "hashtag": "#mykhebeach",
+          "type": "beach"
+        },
+        {
+          "name": "Marble Mountains",
+          "hashtag": "#marblemountains",
+          "type": "nature"
+        }
+      ],
+      "nearby": [
+        "Hoi An",
+        "Hue",
+        "Ba Na Hills"
+      ],
+      "searchQueries": [
+        "danang golden bridge",
+        "danang beach sunset",
+        "danang dragon bridge"
+      ],
+      "pinterestBoards": []
     }
   }
 }

@@ -56,7 +56,7 @@ describe('instagram-graph.fetchOwnMedia — happy path', () => {
     await ig.fetchOwnMedia({ accessToken: 'secret_tok', limit: 10, fetchImpl });
 
     const [url, opts] = fetchImpl.mock.calls[0];
-    expect(url).toContain('graph.instagram.com/v21.0/me/media');
+    expect(url).toContain('graph.instagram.com/v23.0/me/media');
     expect(url).toContain('access_token=secret_tok');
     expect(url).toContain('limit=10');
     expect(url).toContain('fields=id');

@@ -6,7 +6,7 @@
 //
 // Требует long-lived access token. Токен тот же, что для публикации.
 
-const IG_GRAPH = 'https://graph.instagram.com/v21.0';
+const IG_GRAPH = 'https://graph.instagram.com/v23.0';
 
 /**
  * Возвращает список медиа своих аккаунтов через Graph API.
