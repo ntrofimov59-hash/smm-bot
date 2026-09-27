@@ -1,11 +1,17 @@
 // agent/vision-cache.js — кэш результатов vision по SHA256 файла
-// Один и тот же файл анализируется только 1 раз, дальше — берётся из кэша
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-const CACHE_DIR = path.resolve(new URL('./data/', import.meta.url).pathname, 'vision-cache');
-fs.mkdirSync(CACHE_DIR, { recursive: true });
+const DEFAULT_DATA_DIR = path.resolve(new URL('./data/', import.meta.url).pathname);
+
+function getCacheDir() {
+  const dir = process.env.SMM_DATA_DIR
+    ? path.join(process.env.SMM_DATA_DIR, 'vision-cache')
+    : path.join(DEFAULT_DATA_DIR, 'vision-cache');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
 function fileHash(filePath) {
   const buf = fs.readFileSync(filePath);
@@ -13,14 +19,13 @@ function fileHash(filePath) {
 }
 
 function cacheKey(filePath) {
-  // Хэш только содержимого — если файл переименовали, кэш всё равно работает
   return fileHash(filePath);
 }
 
 export function getCached(filePath) {
   try {
     const key = cacheKey(filePath);
-    const cachePath = path.join(CACHE_DIR, `${key}.json`);
+    const cachePath = path.join(getCacheDir(), `${key}.json`);
     if (!fs.existsSync(cachePath)) return null;
     const raw = fs.readFileSync(cachePath, 'utf8');
     const data = JSON.parse(raw);
@@ -35,7 +40,7 @@ export function getCached(filePath) {
 export function setCache(filePath, result) {
   try {
     const key = cacheKey(filePath);
-    const cachePath = path.join(CACHE_DIR, `${key}.json`);
+    const cachePath = path.join(getCacheDir(), `${key}.json`);
     fs.writeFileSync(cachePath, JSON.stringify({
       ...result,
       cachedAt: new Date().toISOString(),
@@ -48,10 +53,10 @@ export function setCache(filePath, result) {
 
 export function cacheStats() {
   try {
-    const files = fs.readdirSync(CACHE_DIR).filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(getCacheDir()).filter(f => f.endsWith('.json'));
     let totalBytes = 0;
     for (const f of files) {
-      totalBytes += fs.statSync(path.join(CACHE_DIR, f)).size;
+      totalBytes += fs.statSync(path.join(getCacheDir(), f)).size;
     }
     return {
       entries: files.length,

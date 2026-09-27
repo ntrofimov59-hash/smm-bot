@@ -27,7 +27,6 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.0",
-    "nock": "^13.5.0",
     "vitest": "^2.1.0"
   }
 }

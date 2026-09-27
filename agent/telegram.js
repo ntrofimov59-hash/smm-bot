@@ -1,15 +1,22 @@
 // agent/telegram.js — уведомления в Telegram
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+// env читается лениво, чтобы можно было тестировать и менять без перезапуска
+
+function getConfig() {
+  return {
+    token: process.env.TELEGRAM_BOT_TOKEN,
+    chatId: process.env.TELEGRAM_CHAT_ID,
+  };
+}
 
 export async function notify(text, { parseMode = 'HTML', prefix = '🤖 <b>[SMM]</b> ' } = {}) {
-  if (!TOKEN || !CHAT_ID) return { ok: false, error: 'no telegram config' };
+  const { token, chatId } = getConfig();
+  if (!token || !chatId) return { ok: false, error: 'no telegram config' };
   try {
-    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: CHAT_ID,
+        chat_id: chatId,
         text: prefix ? `${prefix}\n\n${text}` : text,
         parse_mode: parseMode,
         disable_web_page_preview: true,

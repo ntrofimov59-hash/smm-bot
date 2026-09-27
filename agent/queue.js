@@ -2,43 +2,48 @@
 import fs from 'fs';
 import path from 'path';
 
-const DATA_DIR = path.resolve(new URL('./data/', import.meta.url).pathname);
-fs.mkdirSync(DATA_DIR, { recursive: true });
+const DEFAULT_DATA_DIR = path.resolve(new URL('./data/', import.meta.url).pathname);
 
-const QUEUE_FILE = path.join(DATA_DIR, 'queue.json');
+function getDataDir() {
+  return process.env.SMM_DATA_DIR || DEFAULT_DATA_DIR;
+}
+
+function getQueueFile() {
+  const dir = getDataDir();
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'queue.json');
+}
 
 function load() {
   try {
-    if (fs.existsSync(QUEUE_FILE)) return JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf8'));
+    const file = getQueueFile();
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (e) { console.warn('queue: load failed:', e.message); }
   return { items: [] };
 }
 
 function save(data) {
   try {
-    const tmp = QUEUE_FILE + '.tmp';
+    const file = getQueueFile();
+    const tmp = file + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-    fs.renameSync(tmp, QUEUE_FILE);
+    fs.renameSync(tmp, file);
   } catch (e) { console.error('queue: save failed:', e.message); }
 }
 
-/**
- * Добавляет пост в очередь.
- * @returns {Object} — item с id
- */
 export function enqueue(item) {
   const data = load();
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const entry = {
     id,
-    status: 'pending', // pending | publishing | published | failed
+    status: 'pending',
     createdAt: new Date().toISOString(),
-    scheduledAt: item.scheduledAt, // ISO timestamp
+    scheduledAt: item.scheduledAt,
     projectSlug: item.projectSlug,
     projectPath: item.projectPath,
     imagePath: item.imagePath,
     imageUrl: item.imageUrl,
-    accounts: item.accounts, // [{username, igUserId, accessToken, city}]
+    accounts: item.accounts,
     caption: item.caption,
     hashtags: item.hashtags,
     visionTags: item.visionTags || [],
