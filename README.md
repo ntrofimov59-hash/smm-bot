@@ -126,6 +126,57 @@ LIMIT_POSTS_DAY=20
 а неофициальный (через скрапинг) приведёт к бану IP. Для чужих постов —
 только с явного согласия владельца через Graph API.
 
+
+## Docker
+
+Бот упакован в Docker. Одна команда — и всё работает на любой машине с Docker.
+
+### Быстрый старт
+
+    # 1. .env с ключами
+    cp .env.example .env
+    $EDITOR .env
+
+    # 2. Сборка образа (multi-stage: builder + runtime)
+    docker compose build
+
+    # 3. Одноразовые команды для проверки (не запускают cron)
+    docker compose run --rm smm-bot node cli.js help
+    docker compose run --rm smm-bot node cli.js status
+    docker compose run --rm smm-bot node cli.js validate
+
+    # 4. Запуск бота в фоне (cron-процесс)
+    docker compose up -d
+    docker compose logs -f smm-bot
+
+### Что внутри
+
+- **Multi-stage build:** builder (pnpm + build tools) → runtime (только prod deps)
+- **tini** как PID 1 — корректная обработка сигналов
+- **`pnpm prune --prod`** — dev-зависимости (vitest) не попадают в runtime
+- **`.dockerignore`** — контекст без `.git`, `node_modules`, `tests`, секретов
+
+### Volumes
+
+| Хост | Контейнер | Что хранит |
+|------|-----------|------------|
+| `./agent/data` | `/app/agent/data` | `queue.json` / `queue.db`, usage, hashtags-used |
+| `./projects` | `/app/projects` | `project.json`, `accounts.json`, `inbox/`, `processed/` |
+| `./logs` | `/app/logs` | логи (при необходимости) |
+| `/var/www/smm-media` | `/var/www/smm-media` | публичные картинки (nginx раздаёт снаружи) |
+
+### Переключение PM2 → Docker
+
+    pm2 stop smm-bot && pm2 delete smm-bot && pm2 save
+    docker compose up -d
+    docker compose logs -f smm-bot
+
+Откат:
+
+    docker compose down
+    pm2 start ecosystem.config.cjs
+    pm2 save
+
 ## Testing
 
 Стек: **Vitest** + **@vitest/coverage-v8** + `vi.stubGlobal('fetch')` для мок-тестов API.
