@@ -90,3 +90,35 @@ LIMIT_POSTS_DAY=20
 
 Уведомления
 Все уведомления идут в аналитический Telegram-бот (ANALYTICS_BOT_TOKEN) с префиксом 🤖 [SMM], чтобы не смешиваться с заявками клиентов.
+
+## Testing
+
+Стек: **Vitest** + **@vitest/coverage-v8** + **nock** (для мок-тестов API).
+
+Запуск:
+
+    pnpm test          # все тесты
+    pnpm test:watch    # watch mode
+    pnpm test:cov      # с покрытием
+
+### Coverage ratchet
+
+Чтобы CI не блокировался из-за непокрытых интеграционных модулей (`vision.js`, `instagram.js`), порог покрытия применяется только к модулям, у которых уже есть тесты. Список — в `vitest.config.js` → `coverage.include`. По мере написания тестов новые модули добавляются туда.
+
+| Модуль | Покрытие | Статус |
+|--------|----------|--------|
+| `planner.js` | 98% | готово |
+| `matcher.js` | 100% | готово |
+| `hashtags.js` | 100% | готово |
+| `usage.js` | 98% | готово |
+| `telegram.js` | — | следующая итерация |
+| `queue.js` | — | следующая итерация |
+| `vision-cache.js` | — | следующая итерация |
+
+### Notable bugs caught by tests
+
+- **Timezone bug in planner** — `scheduleNext` возвращал 15:00 UTC для `11:00 Yerevan` вместо 07:00 UTC. Знак offset был перевёрнут. Поймано unit-тестом на контракт (`getUTCHours() === 7`). См. `tests/unit/planner.test.js`, коммит `a9aae5d`.
+
+### CI
+
+GitHub Actions запускает `pnpm test:cov` на каждый push и PR в `main`. Coverage-артефакт доступен для скачивания на странице Actions.
