@@ -8,6 +8,7 @@ import * as queue from './agent/queue.js';
 import { notify } from './agent/telegram.js';
 import { startHealthServer, stopHealthServer } from './agent/health.js';
 import { startIngestBot } from './agent/telegram-ingest.js';
+import { main as refreshMain } from './agent/refresh-tokens.js';
 
 export async function main() {
   // Env читаем внутри функции — для тестируемости через vi.stubEnv
@@ -54,6 +55,16 @@ export async function main() {
   // Cron: очистка старых записей в 4:00
   jobs.push(cron.schedule('0 4 * * *', () => {
     queue.cleanupOld({ daysToKeep: 30 });
+  }));
+
+  // Cron: refresh Instagram-токенов каждое воскресенье в 3:00
+  jobs.push(cron.schedule('0 3 * * 0', async () => {
+    try {
+      console.log('\n🔐 [cron] Автообновление Instagram токенов...');
+      await refreshMain();
+    } catch (e) {
+      console.error('refresh-tokens error:', e.message);
+    }
   }));
 
   const stats = queue.getStats();

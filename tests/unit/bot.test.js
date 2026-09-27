@@ -93,9 +93,9 @@ describe('bot module — top-level', () => {
 });
 
 describe('bot.main — cron schedules', () => {
-  it('registers exactly 3 cron jobs', async () => {
+  it('registers exactly 4 cron jobs', async () => {
     await bot.main();
-    expect(mockSchedule).toHaveBeenCalledTimes(3);
+    expect(mockSchedule).toHaveBeenCalledTimes(4);
   });
 
   it('uses SCAN_INTERVAL_MIN for scan cron', async () => {
@@ -265,5 +265,13 @@ describe('bot.main — telegram ingest', () => {
     const result = await bot.main();
     expect(result.ingest).toBeNull();
     expect(mockNotify).toHaveBeenCalled();
+  });
+});
+
+describe('bot.main — refresh tokens cron', () => {
+  it('registers weekly refresh-tokens job (Sunday 3:00)', async () => {
+    await bot.main();
+    const exprs = mockSchedule.mock.calls.map(c => c[0]);
+    expect(exprs).toContain('0 3 * * 0');
   });
 });
