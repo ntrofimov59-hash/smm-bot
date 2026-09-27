@@ -289,6 +289,31 @@ GitHub Actions запускает `pnpm test:cov` на каждый push и PR �
 `NODE_V8_COVERAGE=<dir>` и мержить отчёты через `c8 report`. Не сделано, потому что
 сложность не оправдана — сами e2e-сценарии (14 штук) полностью проверяют поведение CLI.
 
+### Pinterest 403 from datacenter IPs
+
+Pinterest блокирует HTTP-запросы с IP-диапазонов хостингов (DigitalOcean,
+AWS, Hetzner и т.д.). Любой запрос к `i.pinimg.com` или `pinterest.com` из
+контейнера/сервера вернёт **403 Forbidden**, даже если URL валидный.
+
+Это **не баг кода** — это защита Pinterest от ботов.
+
+**Что работает:**
+
+- **Заполнить `cities.<key>.pinterestBoards`** реальными URL публичных досок
+  (URL берутся из браузера). Boards отдаются через тот же regex-парсер,
+  но сам HTML-запрос к `pinterest.com` всё равно получит 403 из серверного IP.
+- **Резидентный прокси** (`PINTEREST_PROXY` env, не реализовано — в плане).
+- **Локальный fetch** — запустить `node cli.js fetch pinterest --city X` с
+  домашнего IP, файлы попадут в `inbox/` через volume/rsync.
+
+**Что НЕ работает:**
+
+- `search` fallback с серверного IP.
+- `boards` fetch с серверного IP.
+
+**Альтернатива:** использовать **Instagram Graph API** (`fetch instagram-graph`)
+— официально, без блокировок, только свои аккаунты.
+
 ### Pinterest source: known limitations
 
 `agent/sources/pinterest.js` использует regex-подход: собирает все
