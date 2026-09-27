@@ -295,7 +295,9 @@ export async function processUpdate(update, opts = {}) {
   const userId = msg.from?.id;
 
   if (!isAllowed(userId)) {
-    await reply(chatId, '⛔ Доступ запрещён.');
+    const wl = getWhitelist().join(',') || '(empty — allow all)';
+    console.warn(`[ingest] unauthorized: userId=${userId} chatId=${chatId} whitelist=${wl}`);
+    await reply(chatId, `⛔ Доступ запрещён.\nТвой user_id: <code>${userId}</code>`);
     return { ok: false, reason: 'unauthorized', userId };
   }
 
