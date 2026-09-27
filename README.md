@@ -153,6 +153,8 @@ LIMIT_POSTS_DAY=20
 
 - **Timezone bug in planner** — `scheduleNext` возвращал 15:00 UTC для `11:00 Yerevan` вместо 07:00 UTC. Знак offset был перевёрнут. Поймано unit-тестом на контракт (`getUTCHours() === 7`). См. `tests/unit/planner.test.js`, коммит `a9aae5d`.
 
+- **CI красный, локально зелёный (lazy SDK init)** — все 13 e2e cli-тестов падали с `exit code 1` и пустым stdout **только на CI**. Причина: `agent/vision.js` и `agent/caption.js` создавали `new GoogleGenAI(...)` и `new OpenAI(...)` на top-level модуля с `apiKey: process.env.X`. Локально `.env` есть → ключи подхватываются. На CI `.env` в `.gitignore` → ключи undefined → SDK бросает «Api key is required» при импорте → `cli.js` падает. Unit/integration тесты не ловили, потому что используют `vi.mock()` на SDK. Фикс: lazy init через `getGemini()` / `getGroq()`. Симптом-детект: `mv .env .env.bak && node cli.js help` → exit 1 до фикса, exit 0 после. См. `tests/e2e/cli.test.js`.
+
 - **Pinterest pin id — regex невозможен** — тест ожидал `sourceId = '123456789'`, но CDN-URL не содержит pin id (только hash). Pin id живёт в `<a href="/pin/.../">` отдельно от `<img>`. Фикс: убрали неверную функциональность, задокументировали ограничение, запланировали парсинг `__PWS_DATA__`. См. `tests/unit/sources-pinterest.test.js`.
 
 - **Caption parser override** — при пустом `CAPTION:` от LLM парсер подменял его текстом `"CAPTION:\nHASHTAGS:"` через fallback «весь текст — caption». Main-код считал caption непустым и не применял `fallbackCaption`, публикуя мусор. Фикс: если секции найдены — доверяем им полностью. Поймано тестом на контракт. См. `tests/unit/caption.test.js`.
