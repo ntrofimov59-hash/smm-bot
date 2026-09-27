@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node bot.js",
     "scan": "node cli.js scan",
-    "status": "node cli.js status"
+    "scan:dry": "node cli.js scan --dry",
+    "status": "node cli.js status",
+    "upcoming": "node cli.js upcoming",
+    "refresh-tokens": "node agent/refresh-tokens.js"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",
