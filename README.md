@@ -209,3 +209,25 @@ GitHub Actions запускает `pnpm test:cov` на каждый push и PR �
 Это работает с undici, быстрее и явно проверяет контракт (URL, method, headers, body).
 
 Аналогичный подход используется для Instagram Graph API, Groq и Gemini.
+
+### Бэкенды очереди
+
+Бот поддерживает два бэкенда. Выбор — через `QUEUE_BACKEND` в `.env`.
+
+| Бэкенд | Файл | Когда использовать |
+|--------|------|-------------------|
+| `json` (по умолчанию) | `data/queue.json` | маленькая очередь, простой дебаг |
+| `sqlite` | `data/queue.db` | прод, ACID, индексы, WAL |
+
+Переключение:
+```bash
+# посмотреть, что где лежит
+node cli.js queue info
+
+# мигрировать (идемпотентно, безопасно)
+QUEUE_BACKEND=sqlite node cli.js queue migrate
+
+# переключить прод — добавить QUEUE_BACKEND=sqlite в .env
+# затем
+pm2 restart smm-bot --update-env
+Миграция не удаляет queue.json (только если явно --delete-old). Откат — поменять env обратно.
