@@ -123,6 +123,8 @@ LIMIT_POSTS_DAY=20
 
 - **Timezone bug in planner** — `scheduleNext` возвращал 15:00 UTC для `11:00 Yerevan` вместо 07:00 UTC. Знак offset был перевёрнут. Поймано unit-тестом на контракт (`getUTCHours() === 7`). См. `tests/unit/planner.test.js`, коммит `a9aae5d`.
 
+- **Caption parser override** — при пустом `CAPTION:` от LLM парсер подменял его текстом `"CAPTION:\nHASHTAGS:"` через fallback «весь текст — caption». Main-код считал caption непустым и не применял `fallbackCaption`, публикуя мусор. Фикс: если секции найдены — доверяем им полностью. Поймано тестом на контракт. См. `tests/unit/caption.test.js`.
+
 ### CI
 
 GitHub Actions запускает `pnpm test:cov` на каждый push и PR в `main`. Coverage-артефакт доступен для скачивания на странице Actions.
