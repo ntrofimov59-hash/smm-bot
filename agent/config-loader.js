@@ -12,7 +12,7 @@ export function loadProject(projectPath) {
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (e) {
-    throw new Error(`project.json: невалидный JSON (${e.message})`);
+    throw new Error(`project.json: невалидный JSON (${e.message})`, { cause: e });
   }
   const r = ProjectSchema.safeParse(raw);
   if (!r.success) throw new ConfigError('project.json', file, r.error);
@@ -29,7 +29,7 @@ export function loadAccounts(projectPath) {
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (e) {
-    throw new Error(`accounts.json: невалидный JSON (${e.message})`);
+    throw new Error(`accounts.json: невалидный JSON (${e.message})`, { cause: e });
   }
   const r = AccountsSchema.safeParse(raw);
   if (!r.success) throw new ConfigError('accounts.json', file, r.error);

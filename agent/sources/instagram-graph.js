@@ -46,7 +46,7 @@ export async function fetchOwnMedia(opts) {
   });
 
   if (!res.ok) {
-    let detail = '';
+    let detail;
     try {
       const body = await res.json();
       detail = body?.error?.message || JSON.stringify(body);
@@ -91,7 +91,7 @@ export async function fetchUserMedia({ igUserId, accessToken, limit = 25, fetchI
   });
 
   if (!res.ok) {
-    let detail = '';
+    let detail;
     try {
       const body = await res.json();
       detail = body?.error?.message || JSON.stringify(body);

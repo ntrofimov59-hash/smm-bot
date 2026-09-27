@@ -100,7 +100,7 @@ ${service ? `Услуга: ${service}` : ''}`;
       caption += `\n\n${signature}`;
     }
 
-    let hashtags = parsed.hashtags.filter(h => h.startsWith('#')).slice(0, maxHashtags);
+    const hashtags = parsed.hashtags.filter(h => h.startsWith('#')).slice(0, maxHashtags);
 
     return { caption, hashtags, tokens };
   } catch (e) {

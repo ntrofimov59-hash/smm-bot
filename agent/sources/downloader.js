@@ -60,7 +60,7 @@ export async function downloadImage(url, destDir, opts = {}) {
     });
   } catch (e) {
     clearTimeout(timer);
-    throw new Error(`downloader: сеть/таймаут: ${e.message}`);
+    throw new Error(`downloader: сеть/таймаут: ${e.message}`, { cause: e });
   }
 
   try {
