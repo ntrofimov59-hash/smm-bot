@@ -1,0 +1,17 @@
+node_modules/
+.env
+data/
+tmp/
+projects/*/inbox/
+projects/*/scheduled/
+projects/*/published/
+projects/*/failed/
+projects/*/processed/
+projects/*/assets/*.jpg
+projects/*/assets/*.png
+*.log
+*.bak
+*.save
+.env.save
+projects/*/accounts.json
+.git.backup/

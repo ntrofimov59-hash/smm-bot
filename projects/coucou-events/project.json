@@ -1,0 +1,150 @@
+{
+  "name": "Coucou Events",
+  "slug": "coucou-events",
+  "timezone": "Asia/Yerevan",
+  "languages": [
+    "ru",
+    "en",
+    "hy"
+  ],
+  "brand": {
+    "tone": "тёплый, профессиональный, но не официальный",
+    "voice": "от лица Анны — старшего менеджера, женский род",
+    "emoji": "умеренно — 1-3 на пост",
+    "avoid": [
+      "канцелярит",
+      "шаблонные фразы",
+      "превосходные степени без факта"
+    ],
+    "signature": "Команда Coucou Events 🎉"
+  },
+  "hashtags": {
+    "base": [
+      "#coucouevents",
+      "#eventplanning",
+      "#eventdecor",
+      "#weddinginspiration"
+    ],
+    "services": {
+      "wedding": [
+        "#weddingplanning",
+        "#weddingdecor",
+        "#brideandgroom"
+      ],
+      "corporate": [
+        "#corporateevents",
+        "#businessevent",
+        "#teambuilding"
+      ],
+      "catering": [
+        "#catering",
+        "#foodstyling",
+        "#eventcatering"
+      ],
+      "tents": [
+        "#tentrental",
+        "#eventtent",
+        "#marquee"
+      ]
+    },
+    "cities": {
+      "phuket": [
+        "#phuket",
+        "#thailand",
+        "#phuketevents",
+        "#phuketwedding",
+        "#beachwedding"
+      ],
+      "yerevan": [
+        "#yerevan",
+        "#armenia",
+        "#yerevanevents",
+        "#armeniawedding",
+        "#caucasus"
+      ],
+      "tbilisi": [
+        "#tbilisi",
+        "#georgia",
+        "#tbilisievents",
+        "#georgiawedding",
+        "#caucasus"
+      ],
+      "prague": [
+        "#prague",
+        "#czech",
+        "#pragueevents",
+        "#praguewedding",
+        "#bohemia"
+      ],
+      "bali": [
+        "#bali",
+        "#indonesia",
+        "#balievents",
+        "#baliwedding",
+        "#islandwedding"
+      ]
+    }
+  },
+  "publishing": {
+    "postsPerDay": 2,
+    "bestHours": [
+      "11:00",
+      "19:00"
+    ],
+    "minHoursBetweenPosts": 4,
+    "maxHashtags": 12
+  },
+  "imageProcessing": {
+    "watermark": {
+      "enabled": false,
+      "text": "coucou-events.com",
+      "position": "bottom-right",
+      "opacity": 0.45,
+      "fontSize": 18,
+      "padding": 32,
+      "noBackground": true
+    },
+    "logo": {
+      "enabled": true,
+      "path": "projects/coucou-events/assets/logo-white.png",
+      "position": "bottom-right",
+      "height": 80,
+      "opacity": 0.9,
+      "padding": 32,
+      "shadow": true
+    },
+    "filter": {
+      "brightness": 1.05,
+      "saturation": 1.1,
+      "warmth": 0.03
+    },
+    "targetSize": [
+      1080,
+      1080
+    ]
+  },
+  "vision": {
+    "enabled": true,
+    "provider": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "tags": [
+      "beach",
+      "mountain",
+      "city",
+      "interior",
+      "food",
+      "nature",
+      "sunset",
+      "flowers",
+      "party",
+      "couple",
+      "tables",
+      "tent"
+    ]
+  },
+  "caption": {
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "maxSentences": 3
+  }
+}

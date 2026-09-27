@@ -1,0 +1,25 @@
+{
+  "name": "smm-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node bot.js",
+    "scan": "node cli.js scan",
+    "status": "node cli.js status"
+  },
+  "dependencies": {
+    "@google/genai": "^2.16.0",
+    "dotenv": "^17.0.0",
+    "node-cron": "^4.0.0",
+    "openai": "^7.20.0",
+    "sharp": "^0.33.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "@google/genai",
+      "protobufjs"
+    ]
+  }
+}

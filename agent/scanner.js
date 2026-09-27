@@ -1,0 +1,212 @@
+// agent/scanner.js — сканирует inbox, обрабатывает фото, добавляет в очередь
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { analyzeImage } from './vision.js';
+import { generateCaption } from './caption.js';
+import { buildHashtags } from './hashtags.js';
+import { processImage } from './image-processor.js';
+import { pickBestMatches } from './matcher.js';
+import { scheduleNext } from './planner.js';
+import * as queue from './queue.js';
+import { notifyScheduled } from './telegram.js';
+
+const PUBLIC_MEDIA_DIR = '/var/www/smm-media';
+const PUBLIC_MEDIA_URL = process.env.MEDIA_PUBLIC_URL || 'https://smm.coucou-events.com/media';
+
+const SUPPORTED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
+/**
+ * Сканирует один проект.
+ * @param {string} projectPath — путь к проекту (projects/coucou-events)
+ * @param {Object} opts
+ * @param {boolean} opts.dryRun — не планировать, только показать
+ * @returns {Promise<{scanned, processed, failed, scheduled}>}
+ */
+export async function scanProject(projectPath, { dryRun = false } = {}) {
+  const projectJsonPath = path.join(projectPath, 'project.json');
+  const accountsJsonPath = path.join(projectPath, 'accounts.json');
+  const inboxDir = path.join(projectPath, 'inbox');
+  const processedDir = path.join(projectPath, 'processed');
+  const scheduledDir = path.join(projectPath, 'scheduled');
+
+  if (!fs.existsSync(projectJsonPath)) {
+    console.warn(`⚠️ Нет project.json в ${projectPath}`);
+    return { scanned: 0, processed: 0, failed: 0, scheduled: 0 };
+  }
+
+  const project = JSON.parse(fs.readFileSync(projectJsonPath, 'utf8'));
+  const accounts = JSON.parse(fs.readFileSync(accountsJsonPath, 'utf8'));
+  const projectSlug = project.slug || path.basename(projectPath);
+
+  fs.mkdirSync(inboxDir, { recursive: true });
+  fs.mkdirSync(processedDir, { recursive: true });
+  fs.mkdirSync(scheduledDir, { recursive: true });
+  fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'scheduled'), { recursive: true });
+  fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'tmp'), { recursive: true });
+
+  const files = fs.readdirSync(inboxDir).filter(f => {
+    const ext = path.extname(f).toLowerCase();
+    return SUPPORTED_EXT.has(ext);
+  });
+
+  const stats = { scanned: files.length, processed: 0, failed: 0, scheduled: 0 };
+  if (!files.length) return stats;
+
+  console.log(`\n📂 ${projectSlug}: ${files.length} файлов в inbox`);
+
+  // Получаем занятые времена
+  const upcoming = queue.getUpcoming({ limit: 100 });
+  const existingTimes = upcoming.map(i => new Date(i.scheduledAt).getTime());
+
+  for (const file of files) {
+    const inputPath = path.join(inboxDir, file);
+    const fileBase = path.basename(file, path.extname(file));
+    const hash = crypto.createHash('md5').update(fileBase + Date.now()).digest('hex').slice(0, 8);
+    const scheduledFilename = `${Date.now()}-${hash}.jpg`;
+    const scheduledPath = path.join(scheduledDir, scheduledFilename);
+
+    console.log(`\n🖼  ${file}`);
+    try {
+      // 1. Vision
+      console.log('  1/6 vision…');
+      const vision = await analyzeImage(inputPath);
+      console.log(`     tags: [${vision.tags.join(', ')}]`);
+      console.log(`     mood: ${vision.mood}`);
+
+      // 2. Подбираем города
+      const matches = pickBestMatches(vision.tags, accounts.instagram || [], { minScore: 0.3, maxResults: 10 });
+      if (!matches.length) {
+        console.log('  ❌ Не подошёл ни один аккаунт');
+        stats.failed++;
+        continue;
+      }
+      console.log(`  → аккаунты: ${matches.map(m => '@' + m.username).join(', ')}`);
+
+      // 3. Определяем услугу (простая эвристика по тегам)
+      const service = inferService(vision.tags);
+
+      // 4. Генерим подпись
+      console.log('  2/6 caption…');
+      const lang = project.languages?.[0] || 'ru';
+      const { caption, hashtags: llmHashtags, tokens } = await generateCaption({
+        description: vision.description,
+        topics: vision.suggestedTopics,
+        mood: vision.mood,
+        city: matches[0]?.city || '',
+        project,
+        lang,
+        service,
+      });
+      console.log(`     tokens: ${tokens}`);
+
+      // 5. Хештеги
+      console.log('  3/6 hashtags…');
+      const finalHashtags = buildHashtags({
+        project,
+        city: matches[0]?.city || '',
+        service,
+        imageTags: vision.tags,
+        llmHashtags,
+        max: project.publishing?.maxHashtags || 12,
+      });
+
+      // 6. Обрабатываем картинку
+      console.log('  4/6 image processing…');
+      const imgResult = await processImage(inputPath, scheduledPath, project.imageProcessing || {});
+      console.log(`     ${imgResult.width}×${imgResult.height}, ${imgResult.sizeKB} KB`);
+
+      // 7. Копируем в публичную папку
+      const publicScheduledPath = path.join(PUBLIC_MEDIA_DIR, 'scheduled', scheduledFilename);
+      fs.copyFileSync(scheduledPath, publicScheduledPath);
+      const imageUrl = `${PUBLIC_MEDIA_URL}/scheduled/${scheduledFilename}`;
+      console.log(`     public: ${imageUrl}`);
+
+      // 8. Планируем
+      const scheduledAt = scheduleNext({
+        project,
+        timezone: project.timezone,
+        existing: existingTimes,
+      });
+      existingTimes.push(scheduledAt.getTime());
+
+      const fullCaption = `${caption}\n\n${finalHashtags.join(' ')}`;
+
+      if (dryRun) {
+        console.log(`  🔎 DRY-RUN: ${scheduledAt.toISOString()}`);
+        console.log(`     caption: ${caption.slice(0, 100)}…`);
+        stats.processed++;
+        // В dry-run не переносим в processed — пусть остаётся в inbox
+        continue;
+      }
+
+      // 9. Добавляем в очередь
+      const entry = queue.enqueue({
+        scheduledAt: scheduledAt.toISOString(),
+        projectSlug,
+        projectPath,
+        imagePath: scheduledPath,
+        imageUrl,
+        accounts: matches.map(m => ({
+          username: m.username,
+          igUserId: m.igUserId,
+          accessToken: m.accessToken,
+          city: m.city,
+        })),
+        caption,
+        hashtags: finalHashtags,
+        visionTags: vision.tags,
+      });
+
+      // 10. Переносим оригинал в processed
+      const processedPath = path.join(processedDir, file);
+      fs.renameSync(inputPath, processedPath);
+
+      console.log(`  ✅ Запланирован на ${scheduledAt.toISOString()} (id=${entry.id})`);
+      stats.processed++;
+      stats.scheduled++;
+    } catch (e) {
+      console.error(`  ❌ Ошибка: ${e.message}`);
+      stats.failed++;
+    }
+  }
+
+  if (stats.scheduled > 0 && !dryRun) {
+    const upcoming = queue.getUpcoming({ limit: 1 });
+    const nextTime = upcoming[0]?.scheduledAt
+      ? new Date(upcoming[0].scheduledAt).toLocaleString('ru-RU', { timeZone: project.timezone })
+      : '—';
+    await notifyScheduled({
+      projectSlug,
+      count: stats.scheduled,
+      nextTime,
+    });
+  }
+
+  return stats;
+}
+
+function inferService(tags) {
+  if (tags.includes('tent') || tags.includes('marquee')) return 'tents';
+  if (tags.includes('food') || tags.includes('table') || tags.includes('dessert')) return 'catering';
+  if (tags.includes('couple') || tags.includes('ceremony') || tags.includes('flowers')) return 'wedding';
+  if (tags.includes('party') || tags.includes('guests')) return 'corporate';
+  return null;
+}
+
+/**
+ * Сканирует все проекты в папке projects/.
+ */
+export async function scanAllProjects({ dryRun = false } = {}) {
+  const rootDir = path.resolve(new URL('../projects/', import.meta.url).pathname);
+  if (!fs.existsSync(rootDir)) return {};
+
+  const dirs = fs.readdirSync(rootDir).filter(d => fs.statSync(path.join(rootDir, d)).isDirectory());
+  const results = {};
+
+  for (const dir of dirs) {
+    results[dir] = await scanProject(path.join(rootDir, dir), { dryRun });
+  }
+
+  return results;
+}

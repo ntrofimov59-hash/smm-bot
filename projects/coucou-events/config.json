@@ -1,0 +1,27 @@
+{
+  "name": "Coucou Events",
+  "timezone": "Asia/Yerevan",
+  "brandVoice": {
+    "tone": "тёплый, но профессиональный",
+    "language": ["ru", "en", "hy"],
+    "emoji": "умеренно (1-3 на пост)",
+    "avoid": ["канцелярит", "шаблонные фразы", "слишком много эмодзи"]
+  },
+  "hashtagsPool": {
+    "base": ["#coucouevents", "#events", "#eventplanning", "#wedding", "#corporate"],
+    "cities": {
+      "yerevan": ["#yerevan", "#erevan", "#armenia"],
+      "tbilisi": ["#tbilisi", "#georgia"],
+      "prague": ["#prague", "#czech"],
+      "bali": ["#bali", "#indonesia"],
+      "phuket": ["#phuket", "#thailand"]
+    },
+    "services": ["#tentrental", "#catering", "#decor", "#weddingplanning"]
+  },
+  "publishing": {
+    "postsPerDay": 2,
+    "bestHours": ["11:00", "19:00"],
+    "crossPostToFacebook": true
+  },
+  "accounts": []
+}
