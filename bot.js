@@ -6,6 +6,7 @@ import { scanAllProjects } from './agent/scanner.js';
 import { tick as schedulerTick } from './agent/scheduler.js';
 import * as queue from './agent/queue.js';
 import { notify } from './agent/telegram.js';
+import { startHealthServer, stopHealthServer } from './agent/health.js';
 
 export async function main() {
   // Env читаем внутри функции — для тестируемости через vi.stubEnv
@@ -60,6 +61,13 @@ export async function main() {
 📊 Очередь: pending=${stats.pending}, published=${stats.published}, failed=${stats.failed}
 ⏱ Сканирование: каждые ${SCAN_EVERY_MINUTES} мин`);
 
+  // HTTP-сервер для healthcheck и мониторинга
+  try {
+    await startHealthServer();
+  } catch (e) {
+    console.error('health server failed:', e.message);
+  }
+
   console.log('\n✅ SMM Bot запущен');
   return jobs;
 }
@@ -67,6 +75,14 @@ export async function main() {
 // Запускаем только при прямом вызове (node bot.js), не при импорте из тестов
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
+  const shutdown = async (signal) => {
+    console.log(`\n🛑 ${signal} — останавливаюсь...`);
+    try { await stopHealthServer(); } catch {}
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
   main().catch(e => {
     console.error('FATAL:', e);
     process.exit(1);

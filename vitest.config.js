@@ -16,6 +16,7 @@ export default defineConfig({
         'agent/config-loader.js',
         'bot.js',
         'agent/refresh-tokens.js',
+        'agent/health.js',
         'agent/planner.js',
         'agent/matcher.js',
         'agent/hashtags.js',

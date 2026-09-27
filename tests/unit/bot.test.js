@@ -7,6 +7,7 @@ const {
   mockGetStats,
   mockCleanupOld,
   mockNotify,
+  mockStartHealth,
 } = vi.hoisted(() => ({
   mockSchedule: vi.fn((expr, fn) => ({ expr, fn, stop: vi.fn() })),
   mockScanAllProjects: vi.fn(),
@@ -14,6 +15,7 @@ const {
   mockGetStats: vi.fn(),
   mockCleanupOld: vi.fn(),
   mockNotify: vi.fn(),
+  mockStartHealth: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('node-cron', () => ({
@@ -37,6 +39,11 @@ vi.mock('../../agent/telegram.js', () => ({
   notify: mockNotify,
 }));
 
+vi.mock('../../agent/health.js', () => ({
+  startHealthServer: mockStartHealth,
+  stopHealthServer: vi.fn().mockResolvedValue(undefined),
+}));
+
 let bot;
 let logSpy;
 let errSpy;
@@ -49,6 +56,7 @@ beforeEach(async () => {
   mockGetStats.mockReset().mockReturnValue({ pending: 0, published: 0, failed: 0, total: 0 });
   mockCleanupOld.mockReset();
   mockNotify.mockReset().mockResolvedValue({ ok: true });
+  mockStartHealth.mockReset().mockResolvedValue(null);
 
   vi.stubEnv('SCAN_INTERVAL_MIN', '15');
   vi.stubEnv('SCHEDULER_INTERVAL_MIN', '1');
