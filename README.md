@@ -93,7 +93,7 @@ LIMIT_POSTS_DAY=20
 
 ## Testing
 
-Стек: **Vitest** + **@vitest/coverage-v8** + **nock** (для мок-тестов API).
+Стек: **Vitest** + **@vitest/coverage-v8** + `vi.stubGlobal('fetch')` для мок-тестов API.
 
 Запуск:
 
@@ -111,9 +111,13 @@ LIMIT_POSTS_DAY=20
 | `matcher.js` | 100% | готово |
 | `hashtags.js` | 100% | готово |
 | `usage.js` | 98% | готово |
-| `telegram.js` | — | следующая итерация |
-| `queue.js` | — | следующая итерация |
-| `vision-cache.js` | — | следующая итерация |
+| `queue.js` | 100% | готово |
+| `telegram.js` | 100% | готово |
+| `vision-cache.js` | 93% | готово |
+| `caption.js` | — | следующая итерация |
+| `vision.js` | — | следующая итерация |
+| `instagram.js` | — | следующая итерация |
+| `scanner.js` | — | e2e |
 
 ### Notable bugs caught by tests
 
@@ -122,3 +126,18 @@ LIMIT_POSTS_DAY=20
 ### CI
 
 GitHub Actions запускает `pnpm test:cov` на каждый push и PR в `main`. Coverage-артефакт доступен для скачивания на странице Actions.
+
+
+
+### nock не перехватывает fetch
+
+Первая версия `tests/unit/telegram.test.js` использовала **nock** — все 8 тестов
+упали, запросы уходили в реальную сеть и получали `Not Found` от Telegram.
+
+**Причина:** nock перехватывает `http.request` / `https.request` (legacy Node API),
+но **не** нативный `fetch` (undici), который используется в коде.
+
+**Решение:** мок `fetch` напрямую через `vi.stubGlobal('fetch', mockFn)`.
+Это работает с undici, быстрее и явно проверяет контракт (URL, method, headers, body).
+
+Аналогичный подход используется для Instagram Graph API, Groq и Gemini.
