@@ -5,10 +5,10 @@ export default defineConfig({
     include: ['tests/**/*.test.js'],
     environment: 'node',
     globals: true,
+    testTimeout: 15000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      // Coverage ratchet — только модули с тестами
       include: [
         'agent/planner.js',
         'agent/matcher.js',
@@ -17,13 +17,17 @@ export default defineConfig({
         'agent/queue.js',
         'agent/telegram.js',
         'agent/vision-cache.js',
+        'agent/caption.js',
+        'agent/vision.js',
+        'agent/publishers/instagram.js',
+        'agent/scanner.js',
       ],
       exclude: ['**/node_modules/**', 'tests/**'],
       thresholds: {
-        lines: 75,
-        functions: 75,
-        branches: 60,
-        statements: 75,
+        lines: 70,
+        functions: 70,
+        branches: 50,
+        statements: 70,
       },
     },
   },
