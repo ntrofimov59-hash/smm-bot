@@ -106,7 +106,7 @@ describe('instagram.publishToInstagram — container creation', () => {
     await promise;
 
     const [url, opts] = fetchMock.mock.calls[0];
-    expect(url).toBe('https://graph.instagram.com/v21.0/12345/media');
+    expect(url).toBe('https://graph.instagram.com/v23.0/12345/media');
     expect(opts.method).toBe('POST');
     expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
     const body = new URLSearchParams(opts.body);

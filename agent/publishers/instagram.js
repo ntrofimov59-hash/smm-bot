@@ -2,7 +2,7 @@
 // Использует application/x-www-form-urlencoded через URLSearchParams
 import * as usage from '../usage.js';
 
-const IG_API = 'https://graph.instagram.com/v21.0';
+const IG_API = 'https://graph.instagram.com/v23.0';
 
 export async function publishToInstagram({ account, imageUrl, caption }) {
   const t0 = Date.now();
