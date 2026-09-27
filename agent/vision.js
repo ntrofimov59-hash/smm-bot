@@ -5,11 +5,20 @@ import OpenAI from 'openai';
 import { getCached, setCache } from './vision-cache.js';
 import * as usage from './usage.js';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const groq = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: 'https://api.groq.com/openai/v1',
-});
+// Lazy SDK init — иначе модуль падает при импорте, если ключей нет
+// (важно для CI и для e2e-тестов, где dotenv не подхватывает .env)
+let _ai, _groq;
+function getGemini() {
+  if (!_ai) _ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return _ai;
+}
+function getGroq() {
+  if (!_groq) _groq = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: 'https://api.groq.com/openai/v1',
+  });
+  return _groq;
+}
 
 // Каскад моделей Gemini: если одна перегружена — идём на следующую
 const GEMINI_MODELS = [
@@ -99,7 +108,7 @@ async function viaGemini(imagePath) {
       console.log(`🔷 Пробую Gemini: ${model}`);
       const result = await retry(async () => {
         usage.trackGemini();
-        const response = await ai.models.generateContent({
+        const response = await getGemini().models.generateContent({
           model,
           contents: [{
             role: 'user',
@@ -136,7 +145,7 @@ async function viaGroqVision(imagePath) {
   const mime = mimeFor(imagePath);
 
   return retry(async () => {
-    const resp = await groq.chat.completions.create({
+    const resp = await getGroq().chat.completions.create({
       model: GROQ_VISION_MODEL,
       messages: [{
         role: 'user',

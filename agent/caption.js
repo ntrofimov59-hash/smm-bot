@@ -2,10 +2,15 @@
 import OpenAI from 'openai';
 import * as usage from './usage.js';
 
-const groq = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: 'https://api.groq.com/openai/v1',
-});
+// Lazy SDK init (см. vision.js — та же причина)
+let _groq;
+function getGroq() {
+  if (!_groq) _groq = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: 'https://api.groq.com/openai/v1',
+  });
+  return _groq;
+}
 
 const MODEL = process.env.GROQ_CAPTION_MODEL || 'openai/gpt-oss-120b';
 
@@ -67,7 +72,7 @@ ${city ? `Город: ${city}` : ''}
 ${service ? `Услуга: ${service}` : ''}`;
 
   try {
-    const resp = await groq.chat.completions.create({
+    const resp = await getGroq().chat.completions.create({
       model: MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -75,7 +80,6 @@ ${service ? `Услуга: ${service}` : ''}`;
       ],
       temperature: 0.7,
       max_tokens: 600,
-      // БЕЗ response_format — парсим вручную
     });
 
     const tokens = resp.usage?.total_tokens || 0;
@@ -84,21 +88,18 @@ ${service ? `Услуга: ${service}` : ''}`;
     const raw = resp.choices[0]?.message?.content || '';
     const parsed = parseStructuredResponse(raw);
 
-    // Собираем caption
     let caption = (parsed.caption || '').trim();
     if (!caption) {
       console.warn('caption: пустой caption от LLM, использую fallback');
       caption = fallbackCaption(city, mood, topics, lang);
     }
 
-    // Добавляем подпись если её нет
     const signature = brand.signature || 'Команда Coucou Events 🎉';
     const signatureRoot = signature.split(' ').slice(-2).join(' ').slice(0, 15);
     if (!caption.includes(signatureRoot) && !caption.includes('Coucou')) {
       caption += `\n\n${signature}`;
     }
 
-    // Хештеги
     let hashtags = parsed.hashtags.filter(h => h.startsWith('#')).slice(0, maxHashtags);
 
     return { caption, hashtags, tokens };
@@ -113,13 +114,22 @@ ${service ? `Услуга: ${service}` : ''}`;
   }
 }
 
-// Парсер структурированного ответа (не строгий JSON)
+/**
+ * Парсер структурированного ответа (не строгий JSON).
+ *
+ * Приоритет стратегий:
+ * 1. Явные секции CAPTION: ... HASHTAGS: ...
+ *    — если секции найдены, доверяем им на 100%, даже если caption пустой.
+ *    — пустой caption → вызывающий код применит fallbackCaption().
+ * 2. JSON-объект где-то в тексте.
+ * 3. Fallback: весь текст — caption, строки с # — хештеги.
+ */
 function parseStructuredResponse(raw) {
   const text = String(raw || '');
 
-  // Вариант 1: секции CAPTION: ... HASHTAGS: ...
   const captionMatch = text.match(/CAPTION\s*:?\s*\n?([\s\S]*?)(?=\n\s*HASHTAGS\s*:|\n\s*$)/i);
   const hashtagsMatch = text.match(/HASHTAGS\s*:?\s*\n?([\s\S]*?)$/i);
+  const hadSections = /CAPTION\s*:/i.test(text) || /HASHTAGS\s*:/i.test(text);
 
   let caption = '';
   let hashtags = [];
@@ -131,19 +141,22 @@ function parseStructuredResponse(raw) {
     hashtags = (hashtagsMatch[1].match(/#[\w\d_]+/g) || []);
   }
 
-  // Вариант 2 (fallback): пробуем JSON
-  if (!caption) {
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        caption = parsed.caption || parsed.text || '';
-        hashtags = Array.isArray(parsed.hashtags) ? parsed.hashtags : [];
-      }
-    } catch {}
+  // Если LLM явно использовал секции — не подменяем пустой caption текстом.
+  if (hadSections) {
+    return { caption, hashtags };
   }
 
-  // Вариант 3 (fallback): весь текст — caption, хештеги извлекаем
+  // Вариант 2: пробуем JSON
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      caption = parsed.caption || parsed.text || '';
+      hashtags = Array.isArray(parsed.hashtags) ? parsed.hashtags : [];
+    }
+  } catch {}
+
+  // Вариант 3: весь текст — caption, строки с # — хештеги
   if (!caption) {
     const lines = text.split('\n').filter(l => l.trim());
     const captionLines = [];
