@@ -6,6 +6,7 @@ import { scanAllProjects } from './agent/scanner.js';
 import * as queue from './agent/queue.js';
 import * as usage from './agent/usage.js';
 import * as sources from './agent/sources/index.js';
+import { fetchCityAndSave } from './agent/sources/pinterest-city.js';
 import { getQueueInfo, migrateJsonToSqlite } from './agent/queue-migrate.js';
 import { loadProject, loadAccounts } from './agent/config-loader.js';
 
@@ -88,7 +89,7 @@ async function main() {
       if (!source) {
         console.log('Использование: node cli.js fetch <source> [args] --project <slug> [--limit N]');
         console.log('  source: pinterest | instagram-graph | instagram-user');
-        console.log('  pinterest:        node cli.js fetch pinterest <board-url> --project <slug> [--limit N]');
+        console.log('  pinterest:        node cli.js fetch pinterest <board-url> --project <slug> [--limit N]\n  node cli.js fetch pinterest --city <key> --project <slug> [--limit N]');
         console.log('  instagram-graph:  node cli.js fetch instagram-graph --project <slug> [--limit N]');
         console.log('  instagram-user:   node cli.js fetch instagram-user --ig-user-id <id> --project <slug> [--limit N]');
         break;
@@ -111,6 +112,21 @@ async function main() {
 
       const limit = flags.limit ? Number(flags.limit) : 20;
       const params = {};
+
+      if (source === 'pinterest' && flags.city) {
+        const project = loadProject(projectDir);
+        console.log('Fetch pinterest for city ' + flags.city + ' -> ' + inboxDir);
+        const r = await fetchCityAndSave(project, flags.city, inboxDir, {
+          limit,
+          onProgress: (item) => console.log('  + ' + item.filename + ' (' + item.sizeKB + ' KB)'),
+        });
+        console.log('Found: ' + r.found);
+        console.log('Downloaded: ' + r.downloaded.length);
+        console.log('Skipped: ' + r.skipped.length);
+        console.log('Failed: ' + r.failed.length);
+        for (const f of r.failed) console.log('  ! ' + f.imageUrl + ': ' + f.error);
+        break;
+      }
 
       if (source === 'pinterest') {
         params.boardUrl = positional[1];
@@ -269,7 +285,7 @@ async function main() {
   node cli.js queue migrate --delete-old  — и переименовать старый файл
 
 Fetching:
-  node cli.js fetch pinterest <board-url> --project <slug> [--limit N]
+  node cli.js fetch pinterest <board-url> --project <slug> [--limit N]\n  node cli.js fetch pinterest --city <key> --project <slug> [--limit N]
   node cli.js fetch instagram-graph --project <slug> [--limit N]
   node cli.js fetch instagram-user --ig-user-id <id> --project <slug> [--limit N]
 

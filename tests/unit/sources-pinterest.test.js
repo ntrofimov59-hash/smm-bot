@@ -134,3 +134,70 @@ describe('pinterest.fetchPinterestBoard', () => {
     expect(r).toHaveLength(5);
   });
 });
+
+describe('pinterest.fetchPinterestSearch', () => {
+  it('rejects empty query', async () => {
+    await expect(pinterest.fetchPinterestSearch('')).rejects.toThrow(/query/);
+    await expect(pinterest.fetchPinterestSearch(null)).rejects.toThrow(/query/);
+  });
+
+  it('builds search URL from query', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' });
+    await pinterest.fetchPinterestSearch('phuket beach', { fetchImpl });
+    const [url] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://www.pinterest.com/search/pins/?q=phuket%20beach');
+  });
+
+  it('extracts and enriches pins', async () => {
+    const html = '<img src="https://i.pinimg.com/736x/aa/bb/x.jpg">';
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => html });
+    const r = await pinterest.fetchPinterestSearch('phuket', { fetchImpl });
+    expect(r).toHaveLength(1);
+    expect(r[0].source).toBe('pinterest-search');
+    expect(r[0].query).toBe('phuket');
+    expect(r[0].sourceUrl).toContain('phuket');
+  });
+
+  it('throws on non-2xx', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 429 });
+    await expect(pinterest.fetchPinterestSearch('x', { fetchImpl }))
+      .rejects.toThrow(/HTTP 429/);
+  });
+
+  it('respects limit', async () => {
+    const html = Array.from({ length: 20 }, (_, i) =>
+      `<img src="https://i.pinimg.com/736x/${i}/x.jpg">`).join('');
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => html });
+    const r = await pinterest.fetchPinterestSearch('x', { fetchImpl, limit: 3 });
+    expect(r).toHaveLength(3);
+  });
+});
+
+describe('pinterest.parsePinterestHtml — robustness', () => {
+  it('stops at CSS characters (}, {, ;, ,)', () => {
+    const html = `
+      <style>
+        .x { background: url(https://i.pinimg.com/736x/aa/bb/clean.jpg)} .y{}
+      </style>
+      <img src="https://i.pinimg.com/736x/cc/dd/normal.jpg">
+    `;
+    const r = pinterest.parsePinterestHtml(html);
+    for (const pin of r) {
+      expect(pin.imageUrl).not.toMatch(/[{};,()]/);
+    }
+  });
+
+  it('keeps legit URLs with dashes/underscores/dots', () => {
+    const html = '<img src="https://i.pinimg.com/736x/ab-cd/ef_gh/photo-1.2.jpg">';
+    const r = pinterest.parsePinterestHtml(html);
+    expect(r).toHaveLength(1);
+    expect(r[0].imageUrl).toBe('https://i.pinimg.com/736x/ab-cd/ef_gh/photo-1.2.jpg');
+  });
+
+  it('handles real-world inline-style garbage', () => {
+    const html = '<img src="https://i.pinimg.com/736x/d5/3b/01/photo.png)}._YsBbF{border:0}">';
+    const r = pinterest.parsePinterestHtml(html);
+    expect(r).toHaveLength(1);
+    expect(r[0].imageUrl).toBe('https://i.pinimg.com/736x/d5/3b/01/photo.png');
+  });
+});

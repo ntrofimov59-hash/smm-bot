@@ -17,6 +17,7 @@ export const CitySchema = z.object({
   landmarks: z.array(LandmarkSchema).default([]),
   nearby: z.array(z.string()).default([]),
   searchQueries: z.array(z.string()).default([]),
+  pinterestBoards: z.array(z.string().url()).default([]),
 }).passthrough();
 
 export const ProjectSchema = z.object({

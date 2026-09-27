@@ -34,6 +34,7 @@ export default defineConfig({
         'agent/scanner.js',
         'agent/sources/downloader.js',
         'agent/sources/pinterest.js',
+        'agent/sources/pinterest-city.js',
         'agent/sources/instagram-graph.js',
         'agent/sources/index.js',
       ],

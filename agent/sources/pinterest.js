@@ -8,7 +8,7 @@
 // Не требует логина. Работает для публичных досок.
 // ⚠️ Нарушает ToS Pinterest при агрессивном использовании. Не долбить.
 
-const PINIMG_RE = /https:\/\/i\.pinimg\.com\/[^"'\s<>]+/g;
+const PINIMG_RE = /https:\/\/i\.pinimg\.com\/[A-Za-z0-9/_.-]+/g;
 
 function normalizeCdnUrl(url) {
   // У Pinterest до 5 размеров одного пина: /originals/, /736x/, /564x/, /474x/, /236x/
@@ -95,6 +95,52 @@ export async function fetchPinterestBoard(boardUrl, opts = {}) {
       ...p,
       source: 'pinterest',
       sourceUrl: boardUrl,
+    }));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Ищет пины через публичный search Pinterest.
+ * Нестабильно (Pinterest меняет верстку), но работает без ручных досок.
+ *
+ * @param {string} query
+ * @param {{ limit?: number, fetchImpl?: Function, timeoutMs?: number }} opts
+ * @returns {Promise<Array<{ imageUrl, sourceId, source, sourceUrl }>>}
+ */
+export async function fetchPinterestSearch(query, opts = {}) {
+  const { limit = 30, fetchImpl = fetch, timeoutMs = 20_000 } = opts;
+
+  if (!query || typeof query !== 'string') {
+    throw new Error('pinterest: query обязателен');
+  }
+
+  const searchUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetchImpl(searchUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; smm-bot/1.0)',
+        'Accept': 'text/html',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+
+    if (!res.ok) throw new Error(`pinterest-search: HTTP ${res.status}`);
+
+    const html = await res.text();
+    const pins = parsePinterestHtml(html, { limit });
+
+    return pins.map(p => ({
+      ...p,
+      source: 'pinterest-search',
+      sourceUrl: searchUrl,
+      query,
     }));
   } finally {
     clearTimeout(timer);
