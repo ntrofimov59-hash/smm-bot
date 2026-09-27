@@ -1,0 +1,29 @@
+services:
+  smm-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smm-bot:local
+    container_name: smm-bot
+    restart: unless-stopped
+
+    # Переменные читаются из .env как env_file, но не падают в образ
+    env_file:
+      - .env
+
+    volumes:
+      # Данные очереди (JSON или SQLite — оба внутри)
+      - ./agent/data:/app/agent/data
+      # Проекты: project.json, accounts.json, inbox/processed/scheduled/failed
+      - ./projects:/app/projects
+      # Логи (если понадобится — PM2 заменяется на stdout/stderr)
+      - ./logs:/app/logs
+      # Публичные медиа — как в .env MEDIA_DIR
+      - /var/www/smm-media:/var/www/smm-media
+
+    # bot.js — долгоживущий cron-процесс, портов не открывает.
+    # Healthcheck = «процесс жив» (стандартное поведение Docker).
+
+    # При переключении с PM2 на Docker:
+    #   docker compose up -d
+    #   docker compose logs -f smm-bot

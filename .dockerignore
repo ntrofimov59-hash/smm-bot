@@ -1,0 +1,32 @@
+# Не нужно в образе
+node_modules
+.git
+.github
+.gitignore
+coverage
+*.log
+logs
+tmp
+tests
+vitest.config.js
+
+# Секреты и данные
+.env
+.env.*
+!.env.example
+projects/*/inbox
+projects/*/processed
+projects/*/scheduled
+projects/*/published
+projects/*/failed
+projects/*/accounts.json
+agent/data
+
+# Документация
+README.md
+TESTING.md
+CONTRIBUTING.md
+
+# Docker-артефакты
+Dockerfile*
+docker-compose*.yml
