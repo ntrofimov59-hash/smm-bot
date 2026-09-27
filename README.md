@@ -1,4 +1,8 @@
 ![CI](https://github.com/ntrofimov59-hash/smm-bot/actions/workflows/ci.yml/badge.svg)
+![Tests](https://img.shields.io/badge/tests-287%2B%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)
+![Node](https://img.shields.io/badge/node-%3E%3D20-blue)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 # SMM Bot — автоматический менеджер социальных сетей
 
@@ -9,6 +13,18 @@
 
 - [TESTING.md](./TESTING.md) — стратегия тестирования, как мокать, 4 бага, найденные тестами
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — setup, стиль коммитов, правила PR
+
+
+## Содержание
+
+- [Быстрый старт](#быстрый-старт)
+- [Архитектура](#архитектура)
+- [Fetching content](#fetching-content)
+- [Docker](#docker)
+- [Очередь: JSON / SQLite](#бэкенды-очереди)
+- [Тестирование](#testing)
+- [Документация](#документация)
+- [Безопасность](#безопасность)
 
 ## Быстрый старт
 
