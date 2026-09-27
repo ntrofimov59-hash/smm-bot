@@ -101,7 +101,8 @@ async function main() {
         process.exit(1);
       }
 
-      const projectDir = path.resolve('projects', projectSlug);
+      const projectsBase = process.env.PROJECTS_ROOT || 'projects';
+      const projectDir = path.resolve(projectsBase, projectSlug);
       if (!fs.existsSync(projectDir)) {
         console.error(`❌ Проект не найден: ${projectDir}`);
         process.exit(1);
@@ -182,7 +183,9 @@ async function main() {
       const { positional, flags } = parseArgs(process.argv.slice(3));
       const all = flags.all;
 
-      const projectRoot = path.resolve('projects');
+      const projectRoot = process.env.PROJECTS_ROOT
+        ? path.resolve(process.env.PROJECTS_ROOT)
+        : path.resolve('projects');
       if (!fs.existsSync(projectRoot)) {
         console.error('❌ Нет папки projects/');
         process.exit(1);

@@ -217,7 +217,9 @@ function inferService(tags) {
 }
 
 export async function scanAllProjects({ dryRun = false } = {}) {
-  const rootDir = path.resolve(new URL('../projects/', import.meta.url).pathname);
+  const rootDir = process.env.PROJECTS_ROOT
+    ? path.resolve(process.env.PROJECTS_ROOT)
+    : path.resolve(new URL('../projects/', import.meta.url).pathname);
   if (!fs.existsSync(rootDir)) return {};
 
   const dirs = fs.readdirSync(rootDir).filter(d => fs.statSync(path.join(rootDir, d)).isDirectory());

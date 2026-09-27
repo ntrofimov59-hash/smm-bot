@@ -8,13 +8,19 @@ const REPO_ROOT = process.cwd();
 const CLI = path.join(REPO_ROOT, 'cli.js');
 
 let tmpDataDir;
+let tmpProjectsDir;
 
 /**
  * Запускает `node cli.js <args>` с изолированным SMM_DATA_DIR.
  * Возвращает { stdout, stderr, status }. Если exit code != 0 — не бросает.
  */
 function runCli(args = [], opts = {}) {
-  const env = { ...process.env, SMM_DATA_DIR: tmpDataDir, ...(opts.env || {}) };
+  const env = {
+    ...process.env,
+    SMM_DATA_DIR: tmpDataDir,
+    PROJECTS_ROOT: tmpProjectsDir,
+    ...(opts.env || {}),
+  };
   try {
     const stdout = execFileSync('node', [CLI, ...args], {
       cwd: REPO_ROOT,
@@ -41,11 +47,25 @@ function seedQueue(items) {
 }
 
 beforeEach(() => {
-  tmpDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-e2e-'));
+  tmpDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-e2e-data-'));
+  tmpProjectsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-e2e-proj-'));
+
+  // Пустой проект без inbox → scan ничего не делает, не идёт в API
+  const projectDir = path.join(tmpProjectsDir, 'demo');
+  fs.mkdirSync(path.join(projectDir, 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'project.json'), JSON.stringify({
+    slug: 'demo',
+    timezone: 'UTC',
+    publishing: { bestHours: ['11:00'] },
+  }));
+  fs.writeFileSync(path.join(projectDir, 'accounts.json'), JSON.stringify({
+    instagram: [{ username: 'a', igUserId: '1', accessToken: 'IGAA' + 'x'.repeat(60), active: true, cityTags: [] }],
+  }));
 });
 
 afterEach(() => {
   fs.rmSync(tmpDataDir, { recursive: true, force: true });
+  fs.rmSync(tmpProjectsDir, { recursive: true, force: true });
 });
 
 describe('cli.js — help / usage', () => {
