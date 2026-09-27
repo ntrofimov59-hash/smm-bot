@@ -1,10 +1,38 @@
 // cli.js — команды управления
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
 import { scanAllProjects } from './agent/scanner.js';
 import * as queue from './agent/queue.js';
 import * as usage from './agent/usage.js';
+import * as sources from './agent/sources/index.js';
 
 const cmd = process.argv[2] || 'help';
+
+/**
+ * Парсит флаги после позиционного аргумента.
+ * Возвращает { positional: [...], flags: { ... } }
+ */
+function parseArgs(argv) {
+  const positional = [];
+  const flags = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--')) {
+      const key = a.slice(2);
+      const next = argv[i + 1];
+      if (!next || next.startsWith('--')) {
+        flags[key] = true;
+      } else {
+        flags[key] = next;
+        i++;
+      }
+    } else {
+      positional.push(a);
+    }
+  }
+  return { positional, flags };
+}
 
 async function main() {
   switch (cmd) {
@@ -51,6 +79,87 @@ async function main() {
       break;
     }
 
+    case 'fetch': {
+      const { positional, flags } = parseArgs(process.argv.slice(3));
+      const source = positional[0];
+
+      if (!source) {
+        console.log('Использование: node cli.js fetch <source> [args] --project <slug> [--limit N]');
+        console.log('  source: pinterest | instagram-graph | instagram-user');
+        console.log('  pinterest:        node cli.js fetch pinterest <board-url> --project <slug> [--limit N]');
+        console.log('  instagram-graph:  node cli.js fetch instagram-graph --project <slug> [--limit N]');
+        console.log('  instagram-user:   node cli.js fetch instagram-user --ig-user-id <id> --project <slug> [--limit N]');
+        break;
+      }
+
+      const projectSlug = flags.project;
+      if (!projectSlug) {
+        console.error('❌ Нужен --project <slug>');
+        process.exit(1);
+      }
+
+      const projectDir = path.resolve('projects', projectSlug);
+      if (!fs.existsSync(projectDir)) {
+        console.error(`❌ Проект не найден: ${projectDir}`);
+        process.exit(1);
+      }
+
+      const inboxDir = path.join(projectDir, 'inbox');
+      fs.mkdirSync(inboxDir, { recursive: true });
+
+      const limit = flags.limit ? Number(flags.limit) : 20;
+      const params = {};
+
+      if (source === 'pinterest') {
+        params.boardUrl = positional[1];
+        if (!params.boardUrl) {
+          console.error('❌ Нужен board URL');
+          process.exit(1);
+        }
+      } else if (source === 'instagram-graph') {
+        const accountsFile = path.join(projectDir, 'accounts.json');
+        const accounts = JSON.parse(fs.readFileSync(accountsFile, 'utf8'));
+        const acc = (accounts.instagram || []).find(a => a.active && a.accessToken);
+        if (!acc) {
+          console.error('❌ Нет активного Instagram-аккаунта с accessToken в accounts.json');
+          process.exit(1);
+        }
+        params.accessToken = acc.accessToken;
+      } else if (source === 'instagram-user') {
+        const accountsFile = path.join(projectDir, 'accounts.json');
+        const accounts = JSON.parse(fs.readFileSync(accountsFile, 'utf8'));
+        const igUserId = flags['ig-user-id'];
+        if (!igUserId) {
+          console.error('❌ Нужен --ig-user-id <id>');
+          process.exit(1);
+        }
+        const acc = (accounts.instagram || []).find(a => a.igUserId === igUserId);
+        if (!acc?.accessToken) {
+          console.error(`❌ Аккаунт с igUserId=${igUserId} не найден или без accessToken`);
+          process.exit(1);
+        }
+        params.accessToken = acc.accessToken;
+        params.igUserId = igUserId;
+      } else {
+        console.error(`❌ Неизвестный source: ${source}`);
+        process.exit(1);
+      }
+
+      console.log(`📥 Fetch ${source} → ${inboxDir} (limit=${limit})...\n`);
+      const r = await sources.fetchAndSave(source, params, inboxDir, {
+        limit,
+        onProgress: (item) => console.log(`  ✓ ${item.filename} (${item.sizeKB} KB)`),
+      });
+
+      console.log(`\n✅ Готово:`);
+      console.log(`  Скачано: ${r.downloaded.length}`);
+      console.log(`  Ошибок:  ${r.failed.length}`);
+      if (r.failed.length) {
+        for (const f of r.failed) console.log(`    ✗ ${f.imageUrl}: ${f.error}`);
+      }
+      break;
+    }
+
     case 'upcoming': {
       const items = queue.getUpcoming({ limit: 20 });
       console.log(`📅 ${items.length} постов в очереди:\n`);
@@ -84,6 +193,11 @@ async function main() {
   node cli.js scan --dry   — только показать, что будет сделано
   node cli.js upcoming     — ближайшие запланированные посты
   node cli.js publish-now <id> — публиковать немедленно
+
+Fetching:
+  node cli.js fetch pinterest <board-url> --project <slug> [--limit N]
+  node cli.js fetch instagram-graph --project <slug> [--limit N]
+  node cli.js fetch instagram-user --ig-user-id <id> --project <slug> [--limit N]
 
 Основной процесс:
   node bot.js              — постоянный процесс с cron`);
