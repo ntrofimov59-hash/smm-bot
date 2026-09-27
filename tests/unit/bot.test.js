@@ -8,6 +8,7 @@ const {
   mockCleanupOld,
   mockNotify,
   mockStartHealth,
+  mockStartIngest,
 } = vi.hoisted(() => ({
   mockSchedule: vi.fn((expr, fn) => ({ expr, fn, stop: vi.fn() })),
   mockScanAllProjects: vi.fn(),
@@ -16,6 +17,7 @@ const {
   mockCleanupOld: vi.fn(),
   mockNotify: vi.fn(),
   mockStartHealth: vi.fn().mockResolvedValue(null),
+  mockStartIngest: vi.fn().mockReturnValue({ stop: vi.fn().mockResolvedValue() }),
 }));
 
 vi.mock('node-cron', () => ({
@@ -44,6 +46,10 @@ vi.mock('../../agent/health.js', () => ({
   stopHealthServer: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../agent/telegram-ingest.js', () => ({
+  startIngestBot: mockStartIngest,
+}));
+
 let bot;
 let logSpy;
 let errSpy;
@@ -57,9 +63,11 @@ beforeEach(async () => {
   mockCleanupOld.mockReset();
   mockNotify.mockReset().mockResolvedValue({ ok: true });
   mockStartHealth.mockReset().mockResolvedValue(null);
+  mockStartIngest.mockReset().mockReturnValue({ stop: vi.fn().mockResolvedValue() });
 
   vi.stubEnv('SCAN_INTERVAL_MIN', '15');
   vi.stubEnv('SCHEDULER_INTERVAL_MIN', '1');
+  vi.stubEnv('TELEGRAM_INGEST_BOT_TOKEN', 'test-token');
 
   logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -222,5 +230,40 @@ describe('bot.main — cron callbacks', () => {
     const cleanupJob = mockSchedule.mock.calls.find(c => c[0] === '0 4 * * *');
     cleanupJob[1]();
     expect(mockCleanupOld).toHaveBeenCalledWith({ daysToKeep: 30 });
+  });
+});
+
+describe('bot.main — telegram ingest', () => {
+  it('starts ingest bot when TELEGRAM_INGEST_BOT_TOKEN set', async () => {
+    vi.stubEnv('TELEGRAM_INGEST_BOT_TOKEN', 'tok');
+    await bot.main();
+    expect(mockStartIngest).toHaveBeenCalledOnce();
+  });
+
+  it('does NOT start ingest bot when token missing', async () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv('SCAN_INTERVAL_MIN', '15');
+    vi.stubEnv('SCHEDULER_INTERVAL_MIN', '1');
+    // НЕ ставим TELEGRAM_INGEST_BOT_TOKEN
+    vi.resetModules();
+    const fresh = await import('../../bot.js');
+    await fresh.main();
+    expect(mockStartIngest).not.toHaveBeenCalled();
+  });
+
+  it('returns { jobs, ingest } object', async () => {
+    vi.stubEnv('TELEGRAM_INGEST_BOT_TOKEN', 'tok');
+    const result = await bot.main();
+    expect(result).toHaveProperty('jobs');
+    expect(result).toHaveProperty('ingest');
+    expect(Array.isArray(result.jobs)).toBe(true);
+  });
+
+  it('survives ingest start failure (logs error, continues)', async () => {
+    vi.stubEnv('TELEGRAM_INGEST_BOT_TOKEN', 'tok');
+    mockStartIngest.mockImplementationOnce(() => { throw new Error('bad token'); });
+    const result = await bot.main();
+    expect(result.ingest).toBeNull();
+    expect(mockNotify).toHaveBeenCalled();
   });
 });

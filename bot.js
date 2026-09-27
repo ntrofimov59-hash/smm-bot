@@ -7,6 +7,7 @@ import { tick as schedulerTick } from './agent/scheduler.js';
 import * as queue from './agent/queue.js';
 import { notify } from './agent/telegram.js';
 import { startHealthServer, stopHealthServer } from './agent/health.js';
+import { startIngestBot } from './agent/telegram-ingest.js';
 
 export async function main() {
   // Env читаем внутри функции — для тестируемости через vi.stubEnv
@@ -68,22 +69,38 @@ export async function main() {
     console.error('health server failed:', e.message);
   }
 
+  // Telegram ingest bot — приём фото от тебя в inbox проектов.
+  // Стартует только если задан TELEGRAM_INGEST_BOT_TOKEN.
+  let ingest = null;
+  if (process.env.TELEGRAM_INGEST_BOT_TOKEN) {
+    try {
+      ingest = startIngestBot({ onLog: console.log });
+    } catch (e) {
+      console.error('ingest bot failed:', e.message);
+    }
+  } else {
+    console.log('ℹ️  TELEGRAM_INGEST_BOT_TOKEN не задан — ingest bot не запущен');
+  }
+
   console.log('\n✅ SMM Bot запущен');
-  return jobs;
+  return { jobs, ingest };
 }
 
 // Запускаем только при прямом вызове (node bot.js), не при импорте из тестов
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
+  let app = null;
+
   const shutdown = async (signal) => {
     console.log(`\n🛑 ${signal} — останавливаюсь...`);
+    try { if (app?.ingest) await app.ingest.stop(); } catch (e) { console.warn('ingest stop:', e.message); }
     try { await stopHealthServer(); } catch {}
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 
-  main().catch(e => {
+  app = await main().catch(e => {
     console.error('FATAL:', e);
     process.exit(1);
   });
