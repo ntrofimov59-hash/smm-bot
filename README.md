@@ -91,6 +91,36 @@ LIMIT_POSTS_DAY=20
 Уведомления
 Все уведомления идут в аналитический Telegram-бот (ANALYTICS_BOT_TOKEN) с префиксом 🤖 [SMM], чтобы не смешиваться с заявками клиентов.
 
+## Fetching content
+
+Перед сканированием можно наполнить `inbox/` проекта картинками из внешних источников.
+
+    # Pinterest: парсит публичную доску
+    node cli.js fetch pinterest https://www.pinterest.com/user/board/ --project coucou-events --limit 20
+
+    # Instagram (свои аккаунты, официальный Graph API)
+    node cli.js fetch instagram-graph --project coucou-events --limit 25
+
+    # Instagram (бизнес-аккаунт по igUserId, доступ через Graph API)
+    node cli.js fetch instagram-user --ig-user-id 12345 --project coucou-events
+
+После fetch — обычный скан:
+
+    node cli.js scan --dry   # посмотреть что найдено
+    node cli.js scan         # запланировать
+
+### Безопасность
+
+| Источник | Риск бана | Прокси | Примечание |
+|----------|-----------|--------|------------|
+| Pinterest | средний (ToS) | рекомендуются резидентные | публичные доски, UA-маскировка |
+| Instagram Graph | нет | не нужны | только свои аккаунты |
+| Instagram User | нет | не нужны | только с разрешением |
+
+**Почему не парсим чужие Instagram:** официальный API не даёт чужие медиа,
+а неофициальный (через скрапинг) приведёт к бану IP. Для чужих постов —
+только с явного согласия владельца через Graph API.
+
 ## Testing
 
 Стек: **Vitest** + **@vitest/coverage-v8** + `vi.stubGlobal('fetch')` для мок-тестов API.
