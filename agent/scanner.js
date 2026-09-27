@@ -11,24 +11,18 @@ import { scheduleNext } from './planner.js';
 import * as queue from './queue.js';
 import { notifyScheduled } from './telegram.js';
 
-const PUBLIC_MEDIA_DIR = '/var/www/smm-media';
+const PUBLIC_MEDIA_DIR = process.env.MEDIA_DIR || '/var/www/smm-media';
 const PUBLIC_MEDIA_URL = process.env.MEDIA_PUBLIC_URL || 'https://smm.coucou-events.com/media';
 
 const SUPPORTED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
-/**
- * Сканирует один проект.
- * @param {string} projectPath — путь к проекту (projects/coucou-events)
- * @param {Object} opts
- * @param {boolean} opts.dryRun — не планировать, только показать
- * @returns {Promise<{scanned, processed, failed, scheduled}>}
- */
 export async function scanProject(projectPath, { dryRun = false } = {}) {
   const projectJsonPath = path.join(projectPath, 'project.json');
   const accountsJsonPath = path.join(projectPath, 'accounts.json');
   const inboxDir = path.join(projectPath, 'inbox');
   const processedDir = path.join(projectPath, 'processed');
   const scheduledDir = path.join(projectPath, 'scheduled');
+  const failedDir = path.join(projectPath, 'failed');
 
   if (!fs.existsSync(projectJsonPath)) {
     console.warn(`⚠️ Нет project.json в ${projectPath}`);
@@ -42,6 +36,7 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
   fs.mkdirSync(inboxDir, { recursive: true });
   fs.mkdirSync(processedDir, { recursive: true });
   fs.mkdirSync(scheduledDir, { recursive: true });
+  fs.mkdirSync(failedDir, { recursive: true });
   fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'scheduled'), { recursive: true });
   fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'tmp'), { recursive: true });
 
@@ -55,7 +50,6 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
 
   console.log(`\n📂 ${projectSlug}: ${files.length} файлов в inbox`);
 
-  // Получаем занятые времена
   const upcoming = queue.getUpcoming({ limit: 100 });
   const existingTimes = upcoming.map(i => new Date(i.scheduledAt).getTime());
 
@@ -68,25 +62,22 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
 
     console.log(`\n🖼  ${file}`);
     try {
-      // 1. Vision
       console.log('  1/6 vision…');
       const vision = await analyzeImage(inputPath);
       console.log(`     tags: [${vision.tags.join(', ')}]`);
       console.log(`     mood: ${vision.mood}`);
 
-      // 2. Подбираем города
       const matches = pickBestMatches(vision.tags, accounts.instagram || [], { minScore: 0.3, maxResults: 10 });
       if (!matches.length) {
         console.log('  ❌ Не подошёл ни один аккаунт');
+        moveToFailed(inputPath, failedDir, file, 'no matching accounts');
         stats.failed++;
         continue;
       }
       console.log(`  → аккаунты: ${matches.map(m => '@' + m.username).join(', ')}`);
 
-      // 3. Определяем услугу (простая эвристика по тегам)
       const service = inferService(vision.tags);
 
-      // 4. Генерим подпись
       console.log('  2/6 caption…');
       const lang = project.languages?.[0] || 'ru';
       const { caption, hashtags: llmHashtags, tokens } = await generateCaption({
@@ -100,7 +91,6 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
       });
       console.log(`     tokens: ${tokens}`);
 
-      // 5. Хештеги
       console.log('  3/6 hashtags…');
       const finalHashtags = buildHashtags({
         project,
@@ -111,18 +101,15 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
         max: project.publishing?.maxHashtags || 12,
       });
 
-      // 6. Обрабатываем картинку
       console.log('  4/6 image processing…');
       const imgResult = await processImage(inputPath, scheduledPath, project.imageProcessing || {});
       console.log(`     ${imgResult.width}×${imgResult.height}, ${imgResult.sizeKB} KB`);
 
-      // 7. Копируем в публичную папку
       const publicScheduledPath = path.join(PUBLIC_MEDIA_DIR, 'scheduled', scheduledFilename);
       fs.copyFileSync(scheduledPath, publicScheduledPath);
       const imageUrl = `${PUBLIC_MEDIA_URL}/scheduled/${scheduledFilename}`;
       console.log(`     public: ${imageUrl}`);
 
-      // 8. Планируем
       const scheduledAt = scheduleNext({
         project,
         timezone: project.timezone,
@@ -130,17 +117,13 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
       });
       existingTimes.push(scheduledAt.getTime());
 
-      const fullCaption = `${caption}\n\n${finalHashtags.join(' ')}`;
-
       if (dryRun) {
         console.log(`  🔎 DRY-RUN: ${scheduledAt.toISOString()}`);
         console.log(`     caption: ${caption.slice(0, 100)}…`);
         stats.processed++;
-        // В dry-run не переносим в processed — пусть остаётся в inbox
         continue;
       }
 
-      // 9. Добавляем в очередь
       const entry = queue.enqueue({
         scheduledAt: scheduledAt.toISOString(),
         projectSlug,
@@ -150,7 +133,7 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
         accounts: matches.map(m => ({
           username: m.username,
           igUserId: m.igUserId,
-          accessToken: m.accessToken,
+          accessToken: m.accessToken, // TODO: убрать после безопасного store
           city: m.city,
         })),
         caption,
@@ -158,7 +141,6 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
         visionTags: vision.tags,
       });
 
-      // 10. Переносим оригинал в processed
       const processedPath = path.join(processedDir, file);
       fs.renameSync(inputPath, processedPath);
 
@@ -167,6 +149,7 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
       stats.scheduled++;
     } catch (e) {
       console.error(`  ❌ Ошибка: ${e.message}`);
+      moveToFailed(inputPath, failedDir, file, e.message);
       stats.failed++;
     }
   }
@@ -186,6 +169,18 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
   return stats;
 }
 
+function moveToFailed(inputPath, failedDir, file, reason) {
+  try {
+    if (!fs.existsSync(inputPath)) return;
+    const dest = path.join(failedDir, `${Date.now()}-${file}`);
+    fs.renameSync(inputPath, dest);
+    fs.writeFileSync(dest + '.error.txt', String(reason).slice(0, 1000));
+    console.log(`  → перемещён в failed/`);
+  } catch (e) {
+    console.warn('  не удалось переместить в failed:', e.message);
+  }
+}
+
 function inferService(tags) {
   if (tags.includes('tent') || tags.includes('marquee')) return 'tents';
   if (tags.includes('food') || tags.includes('table') || tags.includes('dessert')) return 'catering';
@@ -194,9 +189,6 @@ function inferService(tags) {
   return null;
 }
 
-/**
- * Сканирует все проекты в папке projects/.
- */
 export async function scanAllProjects({ dryRun = false } = {}) {
   const rootDir = path.resolve(new URL('../projects/', import.meta.url).pathname);
   if (!fs.existsSync(rootDir)) return {};

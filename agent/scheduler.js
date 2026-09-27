@@ -1,13 +1,11 @@
 // agent/scheduler.js — публикует посты из очереди, когда пришло время
 import * as queue from './queue.js';
+import * as usage from './usage.js';
 import { publishToInstagram } from './publishers/instagram.js';
 import { notifyPublished, notifyFailed } from './telegram.js';
 
 let running = false;
 
-/**
- * Обрабатывает все pending-посты, время которых пришло.
- */
 export async function tick() {
   if (running) {
     console.log('⏭ scheduler: предыдущий tick ещё выполняется, пропускаю');
@@ -18,9 +16,20 @@ export async function tick() {
     const due = queue.getPending();
     if (!due.length) return;
 
+    const can = usage.canPublishPost();
+    if (!can.ok) {
+      console.warn(`🚫 Лимит постов исчерпан (${can.reason}), пропускаю публикацию`);
+      return;
+    }
+
     console.log(`\n⏰ scheduler: ${due.length} постов к публикации`);
 
     for (const item of due) {
+      const stillCan = usage.canPublishPost();
+      if (!stillCan.ok) {
+        console.warn(`🚫 Лимит постов достигнут во время публикации, останавливаюсь`);
+        break;
+      }
       await publishItem(item);
     }
   } finally {
