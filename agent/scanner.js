@@ -10,6 +10,7 @@ import { pickBestMatches } from './matcher.js';
 import { scheduleNext } from './planner.js';
 import * as queue from './queue.js';
 import { notifyScheduled } from './telegram.js';
+import { loadProject, loadAccounts } from './config-loader.js';
 
 const PUBLIC_MEDIA_DIR = process.env.MEDIA_DIR || '/var/www/smm-media';
 const PUBLIC_MEDIA_URL = process.env.MEDIA_PUBLIC_URL || 'https://smm.coucou-events.com/media';
@@ -36,9 +37,13 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
     return { scanned: 0, processed: 0, failed: 0, scheduled: 0 };
   }
 
-  const project = JSON.parse(fs.readFileSync(projectJsonPath, 'utf8'));
-  const accounts = JSON.parse(fs.readFileSync(accountsJsonPath, 'utf8'));
-  const projectSlug = project.slug || path.basename(projectPath);
+  const project = loadProject(projectPath);
+  const accounts = loadAccounts(projectPath);
+  if (!accounts) {
+    console.warn(`⚠️ Нет accounts.json в ${projectPath} — проект не настроен, пропускаю`);
+    return { scanned: 0, processed: 0, failed: 0, scheduled: 0 };
+  }
+  const projectSlug = project.slug;
 
   fs.mkdirSync(inboxDir, { recursive: true });
   fs.mkdirSync(processedDir, { recursive: true });

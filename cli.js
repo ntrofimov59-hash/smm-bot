@@ -7,6 +7,7 @@ import * as queue from './agent/queue.js';
 import * as usage from './agent/usage.js';
 import * as sources from './agent/sources/index.js';
 import { getQueueInfo, migrateJsonToSqlite } from './agent/queue-migrate.js';
+import { loadProject, loadAccounts } from './agent/config-loader.js';
 
 const cmd = process.argv[2] || 'help';
 
@@ -158,6 +159,46 @@ async function main() {
       if (r.failed.length) {
         for (const f of r.failed) console.log(`    ✗ ${f.imageUrl}: ${f.error}`);
       }
+      break;
+    }
+
+    case 'validate': {
+      const { positional, flags } = parseArgs(process.argv.slice(3));
+      const all = flags.all;
+
+      const projectRoot = path.resolve('projects');
+      if (!fs.existsSync(projectRoot)) {
+        console.error('❌ Нет папки projects/');
+        process.exit(1);
+      }
+
+      let slugs = positional;
+      if (all || !slugs.length) {
+        slugs = fs.readdirSync(projectRoot)
+          .filter(d => fs.statSync(path.join(projectRoot, d)).isDirectory());
+      }
+
+      let failed = 0;
+      for (const slug of slugs) {
+        const dir = path.join(projectRoot, slug);
+        process.stdout.write(`🔍 ${slug}: `);
+        try {
+          loadProject(dir);
+          const a = loadAccounts(dir);
+          const accountsInfo = a ? `${a.instagram.length} IG-аккаунтов` : 'accounts.json отсутствует';
+          console.log(`✅ ok (${accountsInfo})`);
+        } catch (e) {
+          console.log('❌');
+          console.error(e.message);
+          failed++;
+        }
+      }
+
+      if (failed > 0) {
+        console.error(`\n❌ ${failed} из ${slugs.length} проектов с ошибками`);
+        process.exit(1);
+      }
+      console.log(`\n✅ Все ${slugs.length} проектов валидны`);
       break;
     }
 

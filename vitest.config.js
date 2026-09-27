@@ -12,6 +12,8 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       // cli.js НЕ включён — out-of-process (см. README)
       include: [
+        'agent/schemas.js',
+        'agent/config-loader.js',
         'agent/planner.js',
         'agent/matcher.js',
         'agent/hashtags.js',
