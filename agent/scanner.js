@@ -32,6 +32,7 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
   const projectJsonPath = path.join(projectPath, 'project.json');
   const accountsJsonPath = path.join(projectPath, 'accounts.json');
   const inboxDir = path.join(projectPath, 'inbox');
+  const inboxStoriesDir = path.join(projectPath, 'inbox-stories');
   const processedDir = path.join(projectPath, 'processed');
   const scheduledDir = path.join(projectPath, 'scheduled');
   const failedDir = path.join(projectPath, 'failed');
@@ -57,13 +58,22 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
   const projectSlug = project.slug;
 
   fs.mkdirSync(inboxDir, { recursive: true });
+  fs.mkdirSync(inboxStoriesDir, { recursive: true });
   fs.mkdirSync(processedDir, { recursive: true });
   fs.mkdirSync(scheduledDir, { recursive: true });
   fs.mkdirSync(failedDir, { recursive: true });
   fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'scheduled'), { recursive: true });
   fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'tmp'), { recursive: true });
 
-  const files = fs.readdirSync(inboxDir).filter(f => mediaTypeForFile(f) !== null);
+  const filesFromInbox = fs.readdirSync(inboxDir)
+    .filter(f => mediaTypeForFile(f) !== null)
+    .map(f => ({ dir: inboxDir, file: f, sourceKind: 'inbox' }));
+  const filesFromStories = fs.existsSync(inboxStoriesDir)
+    ? fs.readdirSync(inboxStoriesDir)
+        .filter(f => mediaTypeForFile(f) !== null)
+        .map(f => ({ dir: inboxStoriesDir, file: f, sourceKind: 'stories' }))
+    : [];
+  const files = [...filesFromInbox, ...filesFromStories];
 
   const stats = { scanned: files.length, processed: 0, failed: 0, scheduled: 0 };
   if (!files.length) return stats;
@@ -73,17 +83,19 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
   const upcoming = queue.getUpcoming({ limit: 100 });
   const existingTimes = upcoming.map(i => new Date(i.scheduledAt).getTime());
 
-  for (const file of files) {
-    const inputPath = path.join(inboxDir, file);
+  for (const item of files) {
+    const { dir: sourceDir, file, sourceKind } = item;
+    const inputPath = path.join(sourceDir, file);
     const fileBase = path.basename(file, path.extname(file));
     const hash = crypto.createHash('md5').update(fileBase + Date.now()).digest('hex').slice(0, 8);
-    const mediaType = mediaTypeForFile(file);
+    const mediaType = sourceKind === 'stories' ? 'STORIES' : mediaTypeForFile(file);
     const scheduledExt = mediaType === 'REELS' ? '.mp4' : '.jpg';
     const scheduledFilename = `${Date.now()}-${hash}${scheduledExt}`;
     const scheduledPath = path.join(scheduledDir, scheduledFilename);
 
-    const icon = mediaType === 'REELS' ? '🎬' : '🖼 ';
-    console.log(`\n${icon} ${file} [${mediaType}]`);
+    const icon = mediaType === 'REELS' ? '🎬' : (mediaType === 'STORIES' ? '📸' : '🖼 ');
+    const dirTag = sourceKind === 'stories' ? 'inbox-stories/' : 'inbox/';
+    console.log(`\n${icon} ${dirTag}${file} [${mediaType}]`);
     try {
       // Для видео — извлекаем кадр и анализируем его (vision по видео не работает).
       // Кадр кладём в OS-temp, чтобы он не попал в inbox при следующем скане.
@@ -196,47 +208,74 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
         console.log(`     public: ${imageUrl}`);
       }
 
-      const scheduledAt = scheduleNext({
-        project,
-        timezone: project.timezone,
-        existing: existingTimes,
-      });
-      existingTimes.push(scheduledAt.getTime());
+      // Один queue-item НА КАЖДЫЙ аккаунт — со своим временем.
+      // Это даёт «человеческое» поведение: аккаунты разных городов публикуют в разное время.
+      const planned = [];
+
+      for (const acc of matches) {
+        const cityKey = acc.city || null;
+        const scheduledAt = scheduleNext({
+          project,
+          timezone: project.timezone,
+          city: cityKey,
+          mediaType,
+          existing: existingTimes,
+        });
+        existingTimes.push(scheduledAt.getTime());
+
+        if (dryRun) {
+          const cityLocal = cityKey
+            ? scheduledAt.toLocaleString('ru-RU', {
+                timeZone: project.citySchedules?.[cityKey]?.timezone || project.timezone,
+                hour: '2-digit', minute: '2-digit', hour12: false,
+              })
+            : scheduledAt.toISOString();
+          console.log(`  🔎 DRY-RUN @${acc.username}${cityKey ? ' (' + cityKey + ')' : ''}: ${cityLocal}`);
+          continue;
+        }
+
+        const entry = queue.enqueue({
+          scheduledAt: scheduledAt.toISOString(),
+          projectSlug,
+          projectPath,
+          mediaType,
+          imagePath: mediaType === 'IMAGE' ? scheduledPath : null,
+          imageUrl,
+          videoPath: mediaType === 'REELS' ? scheduledPath : null,
+          videoUrl,
+          videoCoverUrl,
+          accounts: [{
+            username: acc.username,
+            igUserId: acc.igUserId,
+            accessToken: acc.accessToken,
+            city: acc.city,
+          }],
+          caption,
+          hashtags: finalHashtags,
+          visionTags: vision.tags,
+        });
+        planned.push({ username: acc.username, scheduledAt, entryId: entry.id });
+      }
 
       if (dryRun) {
-        console.log(`  🔎 DRY-RUN: ${scheduledAt.toISOString()}`);
         console.log(`     caption: ${caption.slice(0, 100)}…`);
         stats.processed++;
         continue;
       }
 
-      const entry = queue.enqueue({
-        scheduledAt: scheduledAt.toISOString(),
-        projectSlug,
-        projectPath,
-        mediaType,
-        imagePath: mediaType === 'IMAGE' ? scheduledPath : null,
-        imageUrl,
-        videoPath: mediaType === 'REELS' ? scheduledPath : null,
-        videoUrl,
-        videoCoverUrl,
-        accounts: matches.map(m => ({
-          username: m.username,
-          igUserId: m.igUserId,
-          accessToken: m.accessToken, // TODO: убрать после безопасного store
-          city: m.city,
-        })),
-        caption,
-        hashtags: finalHashtags,
-        visionTags: vision.tags,
-      });
-
       const processedPath = path.join(processedDir, file);
       fs.renameSync(inputPath, processedPath);
 
-      console.log(`  ✅ Запланирован на ${scheduledAt.toISOString()} (id=${entry.id})`);
+      console.log(`  ✅ Создано ${planned.length} queue-items:`);
+      for (const p of planned) {
+        const cityLocal = p.scheduledAt.toLocaleString('ru-RU', {
+          timeZone: project.timezone,
+          hour: '2-digit', minute: '2-digit', hour12: false,
+        });
+        console.log(`     @${p.username}: ${cityLocal} (id=${p.entryId})`);
+      }
       stats.processed++;
-      stats.scheduled++;
+      stats.scheduled += planned.length;
     } catch (e) {
       console.error(`  ❌ Ошибка: ${e.message}`);
       moveToFailed(inputPath, failedDir, file, e.message);
