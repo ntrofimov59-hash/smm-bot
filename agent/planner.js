@@ -198,5 +198,6 @@ export function planBatch({ count, project, timezone, existing = [] }) {
     taken.push(next.getTime());
   }
 
-  return dates;
+  // Сортируем — shuffle часов в scheduleNext может дать слоты в разном порядке
+  return dates.sort((a, b) => a.getTime() - b.getTime());
 }

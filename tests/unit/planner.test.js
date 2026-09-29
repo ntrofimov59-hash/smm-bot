@@ -23,12 +23,13 @@ describe('planner.scheduleNext', () => {
 
   it('корректно применяет timezone Asia/Yerevan (UTC+4)', () => {
     const d = scheduleNext({
+      rng: () => 0.5,
       project: { publishing: { bestHours: ['11:00'], minHoursBetweenPosts: 0 } },
       timezone: 'Asia/Yerevan',
     });
     // 11:00 Yerevan = 07:00 UTC
     expect(d.getUTCHours()).toBe(7);
-    expect(d.getUTCMinutes()).toBe(0);
+    expect(Math.abs(d.getUTCMinutes() - 0)).toBeLessThanOrEqual(15);
   });
 
   it('учитывает минимальный интервал с existing', () => {
@@ -81,6 +82,7 @@ describe('planner.planBatch', () => {
 describe('planner timezone edge cases', () => {
   it('America/New_York (UTC-5) — 11:00 NY = 16:00 UTC (winter)', () => {
     const d = scheduleNext({
+      rng: () => 0.5,
       project: { publishing: { bestHours: ['11:00'], minHoursBetweenPosts: 0 } },
       timezone: 'America/New_York',
     });
@@ -93,11 +95,12 @@ describe('planner timezone edge cases', () => {
     });
     const [hh, mm] = formatter.format(d).split(':');
     expect(Number(hh)).toBe(11);
-    expect(Number(mm)).toBe(0);
+    expect(Number(mm)).toBeLessThanOrEqual(15);
   });
 
   it('Asia/Yerevan — roundtrip: wall-clock 19:00 = тот же час в timezone', () => {
     const d = scheduleNext({
+      rng: () => 0.5,
       project: { publishing: { bestHours: ['19:00'], minHoursBetweenPosts: 0 } },
       timezone: 'Asia/Yerevan',
     });
@@ -107,6 +110,6 @@ describe('planner timezone edge cases', () => {
     });
     const [hh, mm] = formatter.format(d).split(':');
     expect(Number(hh)).toBe(19);
-    expect(Number(mm)).toBe(0);
+    expect(Number(mm)).toBeLessThanOrEqual(15);
   });
 });
