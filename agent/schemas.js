@@ -20,6 +20,18 @@ export const CitySchema = z.object({
   pinterestBoards: z.array(z.string().url()).default([]),
 }).passthrough();
 
+export const CityScheduleSchema = z.object({
+  timezone: z.string().refine(tz => {
+    try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; }
+    catch { return false; }
+  }, { message: 'timezone: неизвестная IANA-зона' }),
+  peakHours: z.array(z.string().regex(HHMM_RE)).min(1, {
+    message: 'peakHours: хотя бы один "HH:MM"',
+  }),
+  storiesAfterHour: z.number().int().min(0).max(23).default(18),
+  storiesUntilHour: z.number().int().min(0).max(23).default(23),
+}).passthrough();
+
 export const ProjectSchema = z.object({
   slug: z.string().min(1).regex(/^[a-z0-9][a-z0-9-]*$/, {
     message: 'slug: только a-z, 0-9, дефис; начинается с буквы/цифры',
@@ -65,6 +77,10 @@ export const ProjectSchema = z.object({
   }),
 
   cities: z.record(z.string(), CitySchema).default({}),
+
+  // Расписание по городам: таймзона + пиковые часы + правила для Stories
+  // Если для города нет записи — используются общие publishing.bestHours.
+  citySchedules: z.record(z.string(), CityScheduleSchema).default({}),
 
   hashtags: z.object({
     base: z.array(z.string().startsWith('#')).default([]),

@@ -517,5 +517,97 @@
       ],
       "pinterestBoards": []
     }
+  },
+  "citySchedules": {
+    "yerevan": {
+      "timezone": "Asia/Yerevan",
+      "peakHours": [
+        "11:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "tbilisi": {
+      "timezone": "Asia/Tbilisi",
+      "peakHours": [
+        "12:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "prague": {
+      "timezone": "Europe/Prague",
+      "peakHours": [
+        "12:00",
+        "19:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "barcelona": {
+      "timezone": "Europe/Madrid",
+      "peakHours": [
+        "13:00",
+        "21:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "marrakech": {
+      "timezone": "Africa/Casablanca",
+      "peakHours": [
+        "12:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "casablanca": {
+      "timezone": "Africa/Casablanca",
+      "peakHours": [
+        "12:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "phuket": {
+      "timezone": "Asia/Bangkok",
+      "peakHours": [
+        "11:00",
+        "19:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "bali": {
+      "timezone": "Asia/Makassar",
+      "peakHours": [
+        "11:00",
+        "19:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "danang": {
+      "timezone": "Asia/Ho_Chi_Minh",
+      "peakHours": [
+        "11:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "nha_trang": {
+      "timezone": "Asia/Ho_Chi_Minh",
+      "peakHours": [
+        "11:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    }
   }
 }
