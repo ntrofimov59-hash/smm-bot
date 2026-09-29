@@ -46,6 +46,22 @@ export const ProjectSchema = z.object({
     postsPerDay: z.number().int().positive().optional(),
     minHoursBetweenPosts: z.number().positive().default(4),
     maxHashtags: z.number().int().min(1).max(30).default(12),
+    // Reels / Stories (этап 3)
+    reelsPerWeek: z.number().int().min(0).max(21).default(2),
+    storiesPerDay: z.number().int().min(0).max(10).default(1),
+    mediaMix: z.object({
+      images: z.number().min(0).max(1).default(0.6),   // доля постов-фото
+      reels: z.number().min(0).max(1).default(0.3),    // доля Reels
+      stories: z.number().min(0).max(1).default(0.1),  // доля Stories
+    }).default({ images: 0.6, reels: 0.3, stories: 0.1 }),
+    video: z.object({
+      targetWidth: z.number().int().positive().default(1080),
+      targetHeight: z.number().int().positive().default(1920),
+      watermarkPosition: z.enum(['bottom-right', 'bottom-left', 'top-right', 'top-left']).default('bottom-right'),
+      watermarkPadding: z.number().int().nonnegative().default(32),
+      watermarkHeight: z.number().int().positive().default(120),
+      maxDurationSec: z.number().int().positive().default(90),
+    }).default({}),
   }),
 
   cities: z.record(z.string(), CitySchema).default({}),

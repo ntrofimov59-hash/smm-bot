@@ -166,7 +166,7 @@ describe('bot.main — initial scan', () => {
   it('survives initial scan failure (logs error, schedules jobs anyway)', async () => {
     mockScanAllProjects.mockRejectedValueOnce(new Error('vision down'));
     await bot.main();
-    expect(mockSchedule).toHaveBeenCalledTimes(3);
+    expect(mockSchedule).toHaveBeenCalledTimes(4); // scan + scheduler + cleanup + refresh-tokens
     expect(mockNotify).toHaveBeenCalledOnce();
     const errs = errSpy.mock.calls.map(c => c.join(' ')).join('\n');
     expect(errs).toContain('vision down');

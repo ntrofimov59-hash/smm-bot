@@ -46,11 +46,19 @@ async function publishItem(item) {
   const errors = [];
 
   for (const acc of item.accounts) {
-    console.log(`  → @${acc.username}`);
+    console.log(`  → @${acc.username} (${(item.mediaType || 'IMAGE')})`);
+    const mediaType = (item.mediaType || 'IMAGE').toUpperCase();
+    // STORIES не принимают caption — API игнорирует
+    const captionText = mediaType === 'STORIES'
+      ? ''
+      : `${item.caption}\n\n${(item.hashtags || []).join(' ')}`;
     const r = await publishToInstagram({
       account: acc,
+      mediaType,
       imageUrl: item.imageUrl,
-      caption: `${item.caption}\n\n${(item.hashtags || []).join(' ')}`,
+      videoUrl: item.videoUrl,
+      coverUrl: item.videoCoverUrl,
+      caption: captionText,
     });
 
     if (r.ok) {

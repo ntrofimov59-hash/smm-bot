@@ -1,3 +1,7 @@
+// Ускоряем polling для тестов: 1 мс вместо 5 сек.
+// MAX_POLL_ATTEMPTS не трогаем — тесты рассчитывают на 10 попыток для IMAGE.
+process.env.IG_POLL_INTERVAL_MS = '1';
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const { mockTrackPost } = vi.hoisted(() => ({

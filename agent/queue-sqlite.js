@@ -46,6 +46,21 @@ function getDb() {
     CREATE INDEX IF NOT EXISTS idx_status ON items(status);
     CREATE INDEX IF NOT EXISTS idx_scheduled ON items(scheduled_at);
   `);
+
+  // Миграция: добавляем колонки mediaType и видео (безопасно через PRAGMA)
+  const cols = db.prepare('PRAGMA table_info(items)').all().map(c => c.name);
+  const addCol = (name, type) => {
+    if (!cols.includes(name)) {
+      db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
+      console.log(`🔧 queue-sqlite: добавлена колонка ${name}`);
+    }
+  };
+  addCol('media_type', "TEXT NOT NULL DEFAULT 'IMAGE'");
+  addCol('video_path', 'TEXT');
+  addCol('video_url', 'TEXT');
+  addCol('video_cover_url', 'TEXT');
+  addCol('video_processing_status', 'TEXT');
+
   _db = db;
   return db;
 }
@@ -66,8 +81,13 @@ function rowToItem(row) {
     scheduledAt: row.scheduled_at,
     projectSlug: row.project_slug,
     projectPath: row.project_path,
+    mediaType: row.media_type || 'IMAGE',
     imagePath: row.image_path,
     imageUrl: row.image_url,
+    videoPath: row.video_path,
+    videoUrl: row.video_url,
+    videoCoverUrl: row.video_cover_url,
+    videoProcessingStatus: row.video_processing_status,
     accounts: JSON.parse(row.accounts_json),
     caption: row.caption,
     hashtags: JSON.parse(row.hashtags_json || '[]'),
@@ -87,12 +107,16 @@ export function enqueue(item) {
   db.prepare(`
     INSERT INTO items (
       id, status, created_at, scheduled_at,
-      project_slug, project_path, image_path, image_url,
+      project_slug, project_path, media_type,
+      image_path, image_url,
+      video_path, video_url, video_cover_url, video_processing_status,
       accounts_json, caption, hashtags_json, vision_tags_json,
       attempts, last_error, published_at, published_post_ids_json
     ) VALUES (
       @id, @status, @createdAt, @scheduledAt,
-      @projectSlug, @projectPath, @imagePath, @imageUrl,
+      @projectSlug, @projectPath, @mediaType,
+      @imagePath, @imageUrl,
+      @videoPath, @videoUrl, @videoCoverUrl, @videoProcessingStatus,
       @accountsJson, @caption, @hashtagsJson, @visionTagsJson,
       0, NULL, NULL, '[]'
     )
@@ -103,8 +127,13 @@ export function enqueue(item) {
     scheduledAt: item.scheduledAt,
     projectSlug: item.projectSlug || null,
     projectPath: item.projectPath || null,
+    mediaType: item.mediaType || 'IMAGE',
     imagePath: item.imagePath || null,
     imageUrl: item.imageUrl || null,
+    videoPath: item.videoPath || null,
+    videoUrl: item.videoUrl || null,
+    videoCoverUrl: item.videoCoverUrl || null,
+    videoProcessingStatus: item.videoProcessingStatus || null,
     accountsJson: JSON.stringify(item.accounts || []),
     caption: item.caption || null,
     hashtagsJson: JSON.stringify(item.hashtags || []),
@@ -156,8 +185,13 @@ export function updateItem(id, patch) {
   const map = {
     status: 'status',
     caption: 'caption',
+    mediaType: 'media_type',
     imagePath: 'image_path',
     imageUrl: 'image_url',
+    videoPath: 'video_path',
+    videoUrl: 'video_url',
+    videoCoverUrl: 'video_cover_url',
+    videoProcessingStatus: 'video_processing_status',
     lastError: 'last_error',
     publishedAt: 'published_at',
     projectSlug: 'project_slug',

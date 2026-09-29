@@ -19,3 +19,9 @@ logs/
 coverage/
 queue.db*
 queue.json.backup*
+tokens-input.env
+projects/*/accounts.json.bak
+agent/*.before-*
+agent/publishers/*.before-*
+agent/prompts/*.before-*
+*.before-*

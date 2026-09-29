@@ -17,7 +17,16 @@ function getQueueFile() {
 function load() {
   try {
     const file = getQueueFile();
-    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      // Миграция старых записей: mediaType по умолчанию IMAGE
+      if (Array.isArray(data.items)) {
+        for (const it of data.items) {
+          if (!it.mediaType) it.mediaType = 'IMAGE';
+        }
+      }
+      return data;
+    }
   } catch (e) { console.warn('queue: load failed:', e.message); }
   return { items: [] };
 }
@@ -41,8 +50,13 @@ export function enqueue(item) {
     scheduledAt: item.scheduledAt,
     projectSlug: item.projectSlug,
     projectPath: item.projectPath,
-    imagePath: item.imagePath,
-    imageUrl: item.imageUrl,
+    mediaType: item.mediaType || 'IMAGE', // IMAGE | REELS | STORIES
+    imagePath: item.imagePath || null,
+    imageUrl: item.imageUrl || null,
+    videoPath: item.videoPath || null,
+    videoUrl: item.videoUrl || null,
+    videoCoverUrl: item.videoCoverUrl || null,
+    videoProcessingStatus: item.videoProcessingStatus || null, // null | 'pending' | 'ready' | 'error'
     accounts: item.accounts,
     caption: item.caption,
     hashtags: item.hashtags,
@@ -55,6 +69,11 @@ export function enqueue(item) {
   data.items.push(entry);
   save(data);
   return entry;
+}
+
+export function getById(id) {
+  const data = load();
+  return data.items.find(i => i.id === id) || null;
 }
 
 export function getPending({ beforeTime } = {}) {
