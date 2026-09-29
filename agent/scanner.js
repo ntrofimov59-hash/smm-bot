@@ -1,11 +1,13 @@
 // agent/scanner.js — сканирует inbox, обрабатывает фото, добавляет в очередь
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { analyzeImage } from './vision.js';
 import { generateCaption } from './caption.js';
 import { buildHashtags } from './hashtags.js';
 import { processImage } from './image-processor.js';
+import { processVideo, extractFrame } from './video-processor.js';
 import { pickBestMatches } from './matcher.js';
 import { scheduleNext } from './planner.js';
 import * as queue from './queue.js';
@@ -16,7 +18,15 @@ import { pickLandmarkForVision, buildCaptionContext } from './locations.js';
 const PUBLIC_MEDIA_DIR = process.env.MEDIA_DIR || '/var/www/smm-media';
 const PUBLIC_MEDIA_URL = process.env.MEDIA_PUBLIC_URL || 'https://smm.coucou-events.com/media';
 
-const SUPPORTED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const VIDEO_EXT = new Set(['.mp4', '.mov', '.avi', '.mkv']);
+
+function mediaTypeForFile(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  if (IMAGE_EXT.has(ext)) return 'IMAGE';
+  if (VIDEO_EXT.has(ext)) return 'REELS';
+  return null;
+}
 
 export async function scanProject(projectPath, { dryRun = false } = {}) {
   const projectJsonPath = path.join(projectPath, 'project.json');
@@ -53,10 +63,7 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
   fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'scheduled'), { recursive: true });
   fs.mkdirSync(path.join(PUBLIC_MEDIA_DIR, 'tmp'), { recursive: true });
 
-  const files = fs.readdirSync(inboxDir).filter(f => {
-    const ext = path.extname(f).toLowerCase();
-    return SUPPORTED_EXT.has(ext);
-  });
+  const files = fs.readdirSync(inboxDir).filter(f => mediaTypeForFile(f) !== null);
 
   const stats = { scanned: files.length, processed: 0, failed: 0, scheduled: 0 };
   if (!files.length) return stats;
@@ -70,13 +77,31 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
     const inputPath = path.join(inboxDir, file);
     const fileBase = path.basename(file, path.extname(file));
     const hash = crypto.createHash('md5').update(fileBase + Date.now()).digest('hex').slice(0, 8);
-    const scheduledFilename = `${Date.now()}-${hash}.jpg`;
+    const mediaType = mediaTypeForFile(file);
+    const scheduledExt = mediaType === 'REELS' ? '.mp4' : '.jpg';
+    const scheduledFilename = `${Date.now()}-${hash}${scheduledExt}`;
     const scheduledPath = path.join(scheduledDir, scheduledFilename);
 
-    console.log(`\n🖼  ${file}`);
+    const icon = mediaType === 'REELS' ? '🎬' : '🖼 ';
+    console.log(`\n${icon} ${file} [${mediaType}]`);
     try {
+      // Для видео — извлекаем кадр и анализируем его (vision по видео не работает).
+      // Кадр кладём в OS-temp, чтобы он не попал в inbox при следующем скане.
+      let visionSourcePath = inputPath;
+      let frameTmpPath = null;
+      if (mediaType === 'REELS') {
+        frameTmpPath = path.join(os.tmpdir(), `smm-frame-${hash}-${Date.now()}.jpg`);
+        const fr = await extractFrame(inputPath, frameTmpPath, 1);
+        if (fr.ok) {
+          visionSourcePath = frameTmpPath;
+        } else {
+          console.warn(`  ⚠️ не удалось извлечь кадр: ${fr.error}`);
+        }
+      }
+
       console.log('  1/6 vision…');
-      const vision = await analyzeImage(inputPath);
+      const vision = await analyzeImage(visionSourcePath);
+      if (frameTmpPath) { try { fs.unlinkSync(frameTmpPath); } catch {} }
       console.log(`     tags: [${vision.tags.join(', ')}]`);
       console.log(`     mood: ${vision.mood}`);
 
@@ -128,14 +153,48 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
         max: project.publishing?.maxHashtags || 12,
       });
 
-      console.log('  4/6 image processing…');
-      const imgResult = await processImage(inputPath, scheduledPath, project.imageProcessing || {});
-      console.log(`     ${imgResult.width}×${imgResult.height}, ${imgResult.sizeKB} KB`);
+      let imageUrl = null;
+      let videoUrl = null;
+      let videoCoverUrl = null;
 
-      const publicScheduledPath = path.join(PUBLIC_MEDIA_DIR, 'scheduled', scheduledFilename);
-      fs.copyFileSync(scheduledPath, publicScheduledPath);
-      const imageUrl = `${PUBLIC_MEDIA_URL}/scheduled/${scheduledFilename}`;
-      console.log(`     public: ${imageUrl}`);
+      if (mediaType === 'REELS') {
+        console.log('  4/6 video processing…');
+        const watermarkPath = path.join(projectPath, 'assets', 'logo-white.png');
+        const vidResult = await processVideo({
+          inputPath,
+          outputPath: scheduledPath,
+          settings: project.publishing?.video || {},
+          watermarkPath: fs.existsSync(watermarkPath) ? watermarkPath : null,
+        });
+        if (!vidResult.ok) {
+          throw new Error(`processVideo: ${vidResult.error}`);
+        }
+        console.log(`     ${vidResult.width}×${vidResult.height}, ${vidResult.durationSec}s, ${vidResult.sizeKB} KB`);
+
+        // Обложка — кадр из уже обработанного видео
+        const coverFilename = `${Date.now()}-${hash}-cover.jpg`;
+        const coverLocalPath = path.join(scheduledDir, coverFilename);
+        const frameResult = await extractFrame(scheduledPath, coverLocalPath, 1);
+        if (frameResult.ok) {
+          const coverPublicPath = path.join(PUBLIC_MEDIA_DIR, 'scheduled', coverFilename);
+          fs.copyFileSync(coverLocalPath, coverPublicPath);
+          videoCoverUrl = `${PUBLIC_MEDIA_URL}/scheduled/${coverFilename}`;
+        }
+
+        const publicVideoPath = path.join(PUBLIC_MEDIA_DIR, 'scheduled', scheduledFilename);
+        fs.copyFileSync(scheduledPath, publicVideoPath);
+        videoUrl = `${PUBLIC_MEDIA_URL}/scheduled/${scheduledFilename}`;
+        console.log(`     public: ${videoUrl}`);
+      } else {
+        console.log('  4/6 image processing…');
+        const imgResult = await processImage(inputPath, scheduledPath, project.imageProcessing || {});
+        console.log(`     ${imgResult.width}×${imgResult.height}, ${imgResult.sizeKB} KB`);
+
+        const publicScheduledPath = path.join(PUBLIC_MEDIA_DIR, 'scheduled', scheduledFilename);
+        fs.copyFileSync(scheduledPath, publicScheduledPath);
+        imageUrl = `${PUBLIC_MEDIA_URL}/scheduled/${scheduledFilename}`;
+        console.log(`     public: ${imageUrl}`);
+      }
 
       const scheduledAt = scheduleNext({
         project,
@@ -155,8 +214,12 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
         scheduledAt: scheduledAt.toISOString(),
         projectSlug,
         projectPath,
-        imagePath: scheduledPath,
+        mediaType,
+        imagePath: mediaType === 'IMAGE' ? scheduledPath : null,
         imageUrl,
+        videoPath: mediaType === 'REELS' ? scheduledPath : null,
+        videoUrl,
+        videoCoverUrl,
         accounts: matches.map(m => ({
           username: m.username,
           igUserId: m.igUserId,
