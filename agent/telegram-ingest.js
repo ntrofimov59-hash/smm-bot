@@ -28,6 +28,7 @@ function getProjectsRoot() {
 const IMAGE_EXT = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.gif', '.tiff', '.tif', '.bmp',
 ]);
+const VIDEO_EXT = new Set(['.mp4', '.mov', '.avi', '.mkv']);
 
 const UNSUPPORTED_EXT = new Set(['.heic', '.heif']);
 
@@ -52,8 +53,21 @@ function uniqueFilename() {
   return `${ts}-tg-${rand}`;
 }
 
-function ensureInbox(projectSlug) {
-  const dir = path.join(getProjectsRoot(), projectSlug, 'inbox');
+
+/**
+ * Определяет подпапку inbox по подписи.
+ * По умолчанию inbox/, при наличии #stories (регистронезависимо) — inbox-stories/.
+ */
+function resolveInboxSubdir(message) {
+  const caption = (message.caption || '').toLowerCase();
+  if (/(^|\s)#stories\b/.test(caption) || caption.includes('#stories')) {
+    return 'inbox-stories';
+  }
+  return 'inbox';
+}
+
+function ensureInbox(projectSlug, subdir = 'inbox') {
+  const dir = path.join(getProjectsRoot(), projectSlug, subdir);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -197,10 +211,11 @@ async function handlePhoto(message, projectSlug, opts) {
     throw new Error(`файл подозрительно маленький (${buf.length} байт) — вероятно не картинка`);
   }
 
-  const dir = ensureInbox(projectSlug);
+  const subdir = resolveInboxSubdir(message);
+  const dir = ensureInbox(projectSlug, subdir);
   const filename = uniqueFilename() + '.jpg';
   fs.writeFileSync(path.join(dir, filename), buf);
-  return { saved: 1, filename, sizeBytes: buf.length };
+  return { saved: 1, filename, sizeBytes: buf.length, subdir };
 }
 
 async function handleDocument(message, projectSlug, opts) {
@@ -218,8 +233,10 @@ async function handleDocument(message, projectSlug, opts) {
     return { saved: 0, skipped: 1, reason: `unsupported format ${ext}` };
   }
 
-  if (!IMAGE_EXT.has(ext)) {
-    return { saved: 0, skipped: 1, reason: `not an image (${ext || doc.mime_type})` };
+  const isImage = IMAGE_EXT.has(ext);
+  const isVideo = VIDEO_EXT.has(ext);
+  if (!isImage && !isVideo) {
+    return { saved: 0, skipped: 1, reason: `not an image/video (${ext || doc.mime_type})` };
   }
 
   const buf = await downloadByFileId(doc.file_id, opts);
@@ -228,11 +245,12 @@ async function handleDocument(message, projectSlug, opts) {
     return { saved: 0, skipped: 1, reason: `файл слишком маленький (${buf.length} байт)` };
   }
 
-  const dir = ensureInbox(projectSlug);
+  const subdir = resolveInboxSubdir(message);
+  const dir = ensureInbox(projectSlug, subdir);
   const outExt = ext === '.jpeg' ? '.jpg' : ext;
   const filename = uniqueFilename() + outExt;
   fs.writeFileSync(path.join(dir, filename), buf);
-  return { saved: 1, filename, sizeBytes: buf.length };
+  return { saved: 1, filename, sizeBytes: buf.length, subdir, kind: isVideo ? 'video' : 'image' };
 }
 
 async function handleZip(message, projectSlug, opts) {
@@ -318,7 +336,7 @@ export async function processUpdate(update, opts = {}) {
   if (msg.photo?.length) {
     try {
       const r = await handlePhoto(msg, projectSlug, opts);
-      await reply(chatId, `✅ Фото → <b>${projectSlug}/inbox</b> (${Math.round(r.sizeBytes / 1024)} KB)${forwardLine}`);
+      await reply(chatId, `✅ Фото → <b>${projectSlug}/${r.subdir || 'inbox'}</b> (${Math.round(r.sizeBytes / 1024)} KB)${forwardLine}`);
       return { ok: true, type: 'photo', ...r, project: projectSlug, forwarded: !!forwardInfo };
     } catch (e) {
       await reply(chatId, `❌ Ошибка: ${e.message}`);
@@ -334,7 +352,7 @@ export async function processUpdate(update, opts = {}) {
         const skippedNote = r.skipped?.length ? `\n⏭ Пропущено: ${r.skipped.length}` : '';
         await reply(chatId, `✅ ZIP → <b>${projectSlug}/inbox</b>\n📷 Извлечено: ${r.saved}${skippedNote}${forwardLine}`);
       } else if (r.saved) {
-        await reply(chatId, `✅ Документ → <b>${projectSlug}/inbox</b> (${Math.round(r.sizeBytes / 1024)} KB)${forwardLine}`);
+        await reply(chatId, `✅ ${r.kind === 'video' ? 'Видео' : 'Документ'} → <b>${projectSlug}/${r.subdir || 'inbox'}</b> (${Math.round(r.sizeBytes / 1024)} KB)${forwardLine}`);
       } else {
         await reply(chatId, `⏭ Пропущено: ${r.reason || 'неизвестный формат'}`);
       }
