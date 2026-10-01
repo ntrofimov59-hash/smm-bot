@@ -26,3 +26,5 @@ agent/publishers/*.before-*
 agent/prompts/*.before-*
 *.before-*
 projects/*/suppliers/
+projects/*/telegram-monitor/
+projects/*/outreach/
