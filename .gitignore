@@ -25,3 +25,4 @@ agent/*.before-*
 agent/publishers/*.before-*
 agent/prompts/*.before-*
 *.before-*
+projects/*/suppliers/
