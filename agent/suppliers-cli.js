@@ -1,21 +1,12 @@
 #!/usr/bin/env node
-// agent/suppliers-cli.js — управление базой поставщиков.
-//
-// Команды:
-//   add <project> --category photographers --name "X" [--city yerevan] [--phone +374...] ...
-//   list <project> [--category X] [--city yerevan] [--verified]
-//   show <project> <id>
-//   edit <project> <id> [--field value]
-//   remove <project> <id>
-//   stats <project>
-//   import <project> <file.json>
-//   export <project> [--category X] > dump.json
-
+// agent/suppliers-cli.js
 import 'dotenv/config';
-import fs from 'fs';
 import path from 'path';
+import fs from 'fs';
 import * as store from './suppliers/store.js';
-import { CATEGORIES, SupplierError } from './suppliers/schemas.js';
+import { fetchSuppliersGeo } from './suppliers/fetch-geo.js';
+import { ingestLeadsBatch } from './suppliers/from-telegram.js';
+import { extractSupplierOffer } from './suppliers/extract-offer.js';
 
 function projectPath(slug) {
   const root = process.env.PROJECTS_ROOT
@@ -32,209 +23,130 @@ function parseArgs(argv) {
       const key = a.slice(2);
       const next = argv[i + 1];
       if (next && !next.startsWith('--')) { args.flags[key] = next; i++; }
-      else { args.flags[key] = true; }
+      else args.flags[key] = true;
     } else args._.push(a);
   }
   return args;
 }
 
-function need(v, name) {
-  if (!v) { console.error(`❌ Пропущен --${name}`); process.exit(1); }
+function need(v, n) {
+  if (!v) { console.error(`❌ нужен --${n}`); process.exit(1); }
   return v;
 }
 
-function parseList(v) {
-  if (!v || v === true) return [];
-  return String(v).split(',').map(s => s.trim()).filter(Boolean);
-}
-
-async function cmdAdd(args) {
-  const [slug] = args._;
-  const p = projectPath(need(slug, 'project'));
-
-  const s = store.addSupplier(p, {
-    category: need(args.flags.category, 'category'),
-    name: need(args.flags.name, 'name'),
-    city: args.flags.city || null,
-    country: args.flags.country || null,
-    languages: parseList(args.flags.languages),
-    phone: args.flags.phone || null,
-    email: args.flags.email || null,
-    instagram: args.flags.instagram || null,
-    telegram: args.flags.telegram || null,
-    website: args.flags.website || null,
-    priceRange: args.flags['price-range'] || null,
-    priceNote: args.flags['price-note'] || null,
-    capacity: args.flags.capacity ? Number(args.flags.capacity) : null,
-    rating: args.flags.rating ? Number(args.flags.rating) : null,
-    worksWithForeigners: !!args.flags['works-with-foreigners'],
-    paymentTerms: args.flags['payment-terms'] || null,
-    notes: args.flags.notes || null,
-    tags: parseList(args.flags.tags),
-    verified: !!args.flags.verified,
-  });
-
-  console.log(`✅ Добавлен: ${s.id} — ${s.name} (${s.category}/${s.city || '—'})`);
-}
-
-async function cmdList(args) {
-  const [slug] = args._;
-  const p = projectPath(need(slug, 'project'));
-  const list = store.listAll(p, {
-    category: args.flags.category || null,
-    city: args.flags.city || null,
-    onlyVerified: !!args.flags.verified,
-  });
-  if (!list.length) { console.log('(пусто)'); return; }
-  for (const s of list) {
-    const contacts = [s.phone, s.instagram, s.email].filter(Boolean).join(' | ');
-    console.log(`${s.id}  [${s.category.padEnd(13)}]  ${(s.city || '—').padEnd(11)}  ${s.name.padEnd(30)}  ${contacts}`);
-  }
-  console.log(`\nВсего: ${list.length}`);
-}
-
-async function cmdShow(args) {
-  const [slug, id] = args._;
-  const p = projectPath(need(slug, 'project'));
-  const s = store.getSupplier(p, need(id, 'id'));
-  if (!s) { console.error('❌ Не найден'); process.exit(1); }
-  console.log(JSON.stringify(s, null, 2));
-}
-
-async function cmdEdit(args) {
-  const [slug, id] = args._;
-  const p = projectPath(need(slug, 'project'));
-  const patch = {};
-  const mapping = {
-    name: 'name', city: 'city', phone: 'phone', email: 'email',
-    instagram: 'instagram', telegram: 'telegram', website: 'website',
-    'price-range': 'priceRange', 'price-note': 'priceNote',
-    notes: 'notes', capacity: 'capacity', rating: 'rating',
-    'works-with-foreigners': 'worksWithForeigners',
-    'payment-terms': 'paymentTerms', verified: 'verified',
-  };
-  for (const [flag, field] of Object.entries(mapping)) {
-    if (args.flags[flag] !== undefined) {
-      let v = args.flags[flag];
-      if (field === 'capacity' || field === 'rating') v = Number(v);
-      if (field === 'verified' || field === 'worksWithForeigners') v = v === true || v === 'true';
-      patch[field] = v;
-    }
-  }
-  if (args.flags.languages) patch.languages = parseList(args.flags.languages);
-  if (args.flags.tags) patch.tags = parseList(args.flags.tags);
-
-  const s = store.updateSupplier(p, need(id, 'id'), patch);
-  if (!s) { console.error('❌ Не найден'); process.exit(1); }
-  console.log(`✅ Обновлён: ${s.name}`);
-}
-
-async function cmdRemove(args) {
-  const [slug, id] = args._;
-  const p = projectPath(need(slug, 'project'));
-  const ok = store.removeSupplier(p, need(id, 'id'));
-  console.log(ok ? '✅ Удалён' : '❌ Не найден');
-}
-
-async function cmdStats(args) {
-  const [slug] = args._;
-  const p = projectPath(need(slug, 'project'));
-  const st = store.stats(p);
-  console.log(`📊 База поставщиков — ${slug}`);
-  console.log(`\nВсего: ${st.total}\n`);
-  for (const [cat, n] of Object.entries(st.byCategory)) {
-    console.log(`  ${cat.padEnd(15)} ${n}`);
-  }
-}
-
-async function cmdImport(args) {
-  const [slug, file] = args._;
-  const p = projectPath(need(slug, 'project'));
-  need(file, 'file');
-
-  if (!fs.existsSync(file)) {
-    console.error(`❌ Нет файла: ${file}`);
-    process.exit(1);
-  }
-
-  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const arr = Array.isArray(raw) ? raw : raw.suppliers;
-  if (!Array.isArray(arr)) {
-    console.error('❌ Ожидался массив или {suppliers: [...]}');
-    process.exit(1);
-  }
-
-  let added = 0, dup = 0, err = 0;
-  for (const item of arr) {
-    try {
-      store.addSupplier(p, item);
-      added++;
-    } catch (e) {
-      if (e.message.includes('Дубликат')) dup++;
-      else { err++; console.error('  ❌', e.message); }
-    }
-  }
-  console.log(`✅ Импорт: +${added}, дубликатов: ${dup}, ошибок: ${err}`);
-}
-
-async function cmdExport(args) {
-  const [slug] = args._;
-  const p = projectPath(need(slug, 'project'));
-  const list = store.listAll(p, {
-    category: args.flags.category || null,
-    city: args.flags.city || null,
-  });
-  console.log(JSON.stringify({ suppliers: list }, null, 2));
-}
-
 async function main() {
-  const [cmd, ...rest] = process.argv.slice(2);
-  const args = parseArgs(rest);
+  const args = parseArgs(process.argv.slice(2));
+  const [cmd, slug] = args._;
+  if (!cmd || cmd === 'help') {
+    console.log(`suppliers-cli
 
-  const handlers = {
-    add: cmdAdd,
-    list: cmdList,
-    show: cmdShow,
-    edit: cmdEdit,
-    remove: cmdRemove,
-    stats: cmdStats,
-    import: cmdImport,
-    export: cmdExport,
-  };
-
-  if (!cmd || !handlers[cmd]) {
-    console.log(`suppliers-cli — команды:
-
-  add <project> --category photographers --name "X" [--city yerevan] [--phone +374...]
-      [--instagram @x] [--email x@y.z] [--website https://...]
-      [--price-range $$] [--capacity 200] [--rating 4.8]
-      [--languages ru,en] [--tags wedding,outdoor]
-      [--works-with-foreigners] [--verified] [--notes "..."]
-
-  list <project> [--category X] [--city yerevan] [--verified]
-  show <project> <id>
-  edit <project> <id> [--phone +374...] [--verified] [--notes "..."]
-  remove <project> <id>
   stats <project>
-  import <project> <file.json>
-  export <project> [--category X]
-
-Категории:
-  ${CATEGORIES.join(', ')}
+  list <project> --city yerevan [--category photographers] [--verified]
+  verify <project> <id>
+  unverify <project> <id>
+  add <project> --category photographers --name "..." --city yerevan [--phone ...] [--instagram ...]
+  fetch <project> --city yerevan --category venues [--source osm|2gis|both] [--limit 40]
+  from-leads <project> [--since 2026-10-01] [--limit 200]
+  parse-text --city yerevan "я фотограф, +374..."
+  boards <project> [--city yerevan]
 `);
-    process.exit(cmd ? 1 : 0);
+    return;
   }
 
-  try {
-    await handlers[cmd](args);
-  } catch (e) {
-    if (e instanceof SupplierError) {
-      console.error('❌', e.message);
-    } else {
-      console.error('❌', e.message);
-    }
-    process.exit(1);
+  const p = projectPath(need(slug || args.flags.project, 'project'));
+
+  if (cmd === 'stats') {
+    console.log(store.stats(p));
+    return;
   }
+
+  if (cmd === 'list') {
+    const list = store.listAll(p, {
+      city: args.flags.city || null,
+      category: args.flags.category || null,
+      onlyVerified: !!args.flags.verified,
+    });
+    for (const s of list) {
+      console.log(`${s.id} ${s.verified ? '✅' : '·'} [${s.category}] ${s.city || '—'} ${s.name} ${s.phone || s.instagram || ''}`);
+    }
+    console.log(`\nВсего: ${list.length}`);
+    return;
+  }
+
+  if (cmd === 'verify' || cmd === 'unverify') {
+    const id = args._[2];
+    need(id, 'id');
+    const s = store.updateSupplier(p, id, { verified: cmd === 'verify' });
+    console.log(s ? `✅ ${s.name} verified=${s.verified}` : 'не найден');
+    return;
+  }
+
+  if (cmd === 'add') {
+    const s = store.addSupplier(p, {
+      category: need(args.flags.category, 'category'),
+      name: need(args.flags.name, 'name'),
+      city: need(args.flags.city, 'city'),
+      phone: args.flags.phone,
+      instagram: args.flags.instagram,
+      telegram: args.flags.telegram,
+      email: args.flags.email,
+      website: args.flags.website,
+      verified: !!args.flags.verified,
+      source: 'cli',
+    });
+    console.log('✅', s.id, s.name);
+    return;
+  }
+
+  if (cmd === 'fetch') {
+    const r = await fetchSuppliersGeo(p, {
+      city: need(args.flags.city, 'city'),
+      category: need(args.flags.category, 'category'),
+      source: args.flags.source || 'osm',
+      limit: Number(args.flags.limit || 40),
+    });
+    console.log(r);
+    return;
+  }
+
+  if (cmd === 'from-leads') {
+    const tm = await import('./telegram-monitor/store.js');
+    let leads = tm.listLeads(p, {
+      since: args.flags.since || null,
+      limit: Number(args.flags.limit || 200),
+    });
+    // listLeads уже newest-first; нормализуем city из match
+    leads = leads.map((l) => ({
+      text: l.text,
+      city: l.match?.city || l.city || null,
+      messageUrl: l.messageUrl || null,
+      foundAt: l.foundAt,
+    }));
+    console.log(`Лидов: ${leads.length}`);
+    const r = ingestLeadsBatch(p, leads);
+    console.log(r);
+    return;
+  }
+
+  if (cmd === 'parse-text') {
+    const text = args._.slice(1).join(' ') || args.flags.text;
+    const offer = extractSupplierOffer(text, { city: args.flags.city });
+    console.log(offer || '(не оффер)');
+    return;
+  }
+
+  if (cmd === 'boards') {
+    const f = path.join(p, 'suppliers', 'boards.json');
+    if (!fs.existsSync(f)) { console.log('нет boards.json'); return; }
+    const cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const city = args.flags.city;
+    if (city) console.log(JSON.stringify(cfg.cities[city] || {}, null, 2));
+    else console.log(Object.keys(cfg.cities || {}));
+    return;
+  }
+
+  console.error('неизвестная команда', cmd);
+  process.exit(1);
 }
 
-main();
+main().catch((e) => { console.error(e); process.exit(1); });

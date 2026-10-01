@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as queue from './queue.js';
 import * as usage from './usage.js';
+import { getModuleFlags } from './orchestrator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -62,9 +63,17 @@ function getFullStatus() {
     usageError = e.message;
   }
 
+  let modules;
+  try {
+    modules = getModuleFlags();
+  } catch (e) {
+    modules = { error: e.message };
+  }
+
   return {
     ...getHealth(),
     backend: (process.env.QUEUE_BACKEND || 'json').toLowerCase(),
+    modules,
     queue: queueStats || { error: queueError },
     usage: usageStats || { error: usageError },
   };
@@ -95,6 +104,14 @@ function prometheusMetrics() {
     push('smm_bot_gemini_requests_today', 'Gemini requests today', 'gauge', u.today?.gemini_requests || 0);
     push('smm_bot_posts_today', 'Posts published today', 'gauge', u.today?.posts || 0);
     push('smm_bot_cache_hits_today', 'Vision cache hits today', 'gauge', u.today?.cache_hits || 0);
+  } catch {}
+
+  try {
+    const m = getModuleFlags();
+    push('smm_bot_module_smm', 'SMM module enabled', 'gauge', m.smm ? 1 : 0);
+    push('smm_bot_module_supplier', 'Supplier bot enabled', 'gauge', m.supplier ? 1 : 0);
+    push('smm_bot_module_outreach', 'Outreach module enabled', 'gauge', m.outreach ? 1 : 0);
+    push('smm_bot_module_ingest', 'Ingest bot enabled', 'gauge', m.ingest ? 1 : 0);
   } catch {}
 
   return lines.join('\n') + '\n';
@@ -141,7 +158,6 @@ export function createHealthServer() {
 export function startHealthServer({ port, host } = {}) {
   if (_server) return Promise.resolve(_server);
 
-  // Приоритет: явный аргумент > env > дефолт 3000
   let p;
   if (port !== undefined) {
     p = Number(port);
@@ -179,7 +195,7 @@ export function stopHealthServer() {
   const s = _server;
   _server = null;
   _startedAt = null;
-  return new Promise(resolve => s.close(() => resolve()));
+  return new Promise((resolve) => s.close(() => resolve()));
 }
 
 export function getHealthServer() {

@@ -626,7 +626,21 @@ async function cmdRun(args) {
     projectPath: p,
     onLog: (m) => console.log(m),
     onLead: async (lead) => {
-      // Уведомление в бот аналитики (опционально)
+      // 1) оффер поставщика из текста → suppliers/ (verified: false, city с канала)
+      try {
+        const { ingestLeadAsSupplier } = await import('./suppliers/from-telegram.js');
+        const leadForSupplier = {
+          text: lead.text,
+          city: lead.match?.city || null,
+          messageUrl: lead.messageUrl || null,
+        };
+        const sr = ingestLeadAsSupplier(p, leadForSupplier);
+        if (sr.ok) console.log(`📦 supplier + ${sr.supplier.name} [${sr.supplier.category}/${sr.supplier.city}]`);
+      } catch (e) {
+        console.warn('supplier ingest:', e.message);
+      }
+
+      // 2) уведомление в бот аналитики
       const botToken = process.env.ANALYTICS_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.ANALYTICS_CHAT_ID || process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_ADMIN_CHAT_ID;
       if (!botToken || !chatId) return;

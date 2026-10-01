@@ -35,13 +35,15 @@ export function formatReply(query, result) {
   lines.push(head);
 
   if (result.usedFallback) {
-    lines.push(`<i>в ${city} не нашлось, показал по другим городам</i>`);
+    lines.push(`<i>⚠️ в ${city} не нашлось — показал другие города (fallback)</i>`);
+  } else if (city) {
+    lines.push(`<i>только ${city}${result.requireVerified ? ', verified first' : ''}</i>`);
   }
   lines.push('');
 
   for (let i = 0; i < result.list.length; i++) {
     const s = result.list[i];
-    lines.push(`<b>${i + 1}. ${s.name}</b>${s.verified ? ' ✅' : ''}`);
+    lines.push(`<b>${i + 1}. ${s.name}</b>${s.verified ? ' ✅' : ''}${s._score != null ? ' · ' + s._score : ''}`);
     if (s.city) lines.push(`📍 ${s.city}`);
     if (s.priceRange) lines.push(`💰 ${s.priceRange}${s.priceNote ? ' · ' + s.priceNote : ''}`);
     if (s.rating) lines.push(`⭐ ${s.rating}`);

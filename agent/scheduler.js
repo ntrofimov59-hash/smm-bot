@@ -1,8 +1,10 @@
 // agent/scheduler.js — публикует посты из очереди, когда пришло время
+// accessToken берётся из accounts.json, не из queue (legacy fallback есть).
 import * as queue from './queue.js';
 import * as usage from './usage.js';
 import { publishToInstagram } from './publishers/instagram.js';
 import { notifyPublished, notifyFailed } from './telegram.js';
+import { resolveAccountForPublish } from './accounts-resolver.js';
 
 let running = false;
 
@@ -45,15 +47,28 @@ async function publishItem(item) {
   const postIds = [];
   const errors = [];
 
-  for (const acc of item.accounts) {
-    console.log(`  → @${acc.username} (${(item.mediaType || 'IMAGE')})`);
+  for (const accRef of item.accounts || []) {
+    const account = resolveAccountForPublish(item, accRef);
+    if (!account) {
+      const err = `нет токена для @${accRef?.username || accRef?.igUserId} (проверь accounts.json)`;
+      console.error(`    ❌ ${err}`);
+      errors.push({ username: accRef?.username || '?', error: err });
+      await notifyFailed({
+        projectSlug: item.projectSlug,
+        account: accRef?.username || '?',
+        error: err,
+      });
+      continue;
+    }
+
+    console.log(`  → @${account.username} (${(item.mediaType || 'IMAGE')})`);
     const mediaType = (item.mediaType || 'IMAGE').toUpperCase();
-    // STORIES не принимают caption — API игнорирует
     const captionText = mediaType === 'STORIES'
       ? ''
       : `${item.caption}\n\n${(item.hashtags || []).join(' ')}`;
+
     const r = await publishToInstagram({
-      account: acc,
+      account,
       mediaType,
       imageUrl: item.imageUrl,
       videoUrl: item.videoUrl,
@@ -62,18 +77,22 @@ async function publishItem(item) {
     });
 
     if (r.ok) {
-      postIds.push({ username: acc.username, postId: r.postId });
+      postIds.push({ username: account.username, postId: r.postId });
       console.log(`    ✅ postId=${r.postId} (${r.durationMs}ms)`);
     } else {
-      errors.push({ username: acc.username, error: r.error });
+      errors.push({ username: account.username, error: r.error });
       console.error(`    ❌ ${r.error}`);
-      await notifyFailed({ projectSlug: item.projectSlug, account: acc.username, error: r.error });
+      await notifyFailed({
+        projectSlug: item.projectSlug,
+        account: account.username,
+        error: r.error,
+      });
     }
   }
 
   if (postIds.length > 0) {
     queue.markPublished(item.id, postIds);
-    console.log(`✅ Опубликовано в ${postIds.length}/${item.accounts.length} аккаунтов`);
+    console.log(`✅ Опубликовано в ${postIds.length}/${(item.accounts || []).length} аккаунтов`);
     await notifyPublished({
       projectSlug: item.projectSlug,
       accounts: postIds,
@@ -82,7 +101,7 @@ async function publishItem(item) {
       imageUrl: item.imageUrl,
     });
   } else {
-    queue.markFailed(item.id, errors.map(e => `${e.username}: ${e.error}`).join('; '));
+    queue.markFailed(item.id, errors.map((e) => `${e.username}: ${e.error}`).join('; '));
     console.log(`❌ Публикация не удалась ни в один аккаунт`);
   }
 }

@@ -1,5 +1,5 @@
 ![CI](https://github.com/ntrofimov59-hash/smm-bot/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/tests-287%2B%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-428%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -29,8 +29,10 @@
 ## Быстрый старт
 
 ```bash
-# 1. Кидаешь фото в inbox
-cp my-photo.jpg projects/coucou-events/inbox/
+# 1. Кидаешь контент в inbox (посты/Reels) или inbox-stories (Stories)
+cp my-photo.jpg projects/coucou-events/inbox/               # → IMAGE
+cp beautiful-clip.mp4 projects/coucou-events/inbox/         # → REELS
+cp review-photo.jpg projects/coucou-events/inbox-stories/   # → STORIES
 
 # 2. Сканируешь (dry-run — только показать)
 node cli.js scan --dry
@@ -43,31 +45,48 @@ node cli.js status
 
 # 5. Ближайшие посты
 node cli.js upcoming
+Типы контента (mediaType):
+
+IMAGE — фото из inbox/ → обычный пост
+
+REELS — видео (.mp4/.mov/.avi/.mkv) из inbox/ → Reels 9:16 с вотермаркой
+
+STORIES — файлы из inbox-stories/ → Stories, публикуются после 18:00 локального времени города
+
+Через Telegram: отправь файл боту в чат. Без подписи → inbox/ (IMAGE/REELS по расширению). С #stories в подписи → inbox-stories/.
+
 Архитектура
 text
 projects/<project-slug>/
-  ├── project.json     настройки (бренд, хештеги, фильтры, расписание)
+  ├── project.json     настройки (бренд, хештеги, citySchedules, publishing.video)
   ├── accounts.json    аккаунты + токены (Instagram, Facebook, Threads)
-  ├── inbox/           ← сюда кидаешь новые фото
-  ├── scheduled/       обработанные фото с назначенным временем
+  ├── inbox/           ← сюда кидаешь посты и Reels (jpg → IMAGE, mp4 → REELS)
+  ├── inbox-stories/   ← сюда кидаешь Stories (jpg или mp4 → STORIES)
+  ├── scheduled/       обработанные файлы с назначенным временем
   ├── published/       архив опубликованного
   └── failed/          с ошибками
 
 agent/
-  ├── vision.js         анализ фото через Gemini/Groq
-  ├── vision-cache.js   кэш анализов (SHA256)
-  ├── image-processor.js обработка + логотип
-  ├── matcher.js        подбор аккаунтов по тегам
-  ├── caption.js        генерация подписей через Groq
-  ├── hashtags.js       хештеги с ротацией
-  ├── planner.js        планирование времени
-  ├── queue.js          очередь постов
-  ├── scanner.js        сканирует inbox, всё объединяет
-  ├── scheduler.js      публикует по расписанию
+  ├── vision.js          анализ фото через Gemini/Groq
+  ├── vision-cache.js    кэш анализов (SHA256)
+  ├── image-processor.js обработка фото + логотип
+  ├── video-processor.js обработка видео через ffmpeg (9:16, вотермарка, кадр)
+  ├── matcher.js         подбор аккаунтов по тегам
+  ├── caption.js         генерация подписей через Groq
+  ├── hashtags.js        хештеги с ротацией
+  ├── planner.js         планирование времени (citySchedules + пиковые часы)
+  ├── queue.js           очередь постов (JSON/SQLite, mediaType)
+  ├── scanner.js         сканирует inbox + inbox-stories, всё объединяет
+  ├── scheduler.js       публикует по расписанию
   ├── publishers/
-  │   └── instagram.js  publication через graph.instagram.com
-  ├── telegram.js       уведомления в аналитический бот
-  └── usage.js          лимиты и расход
+  │   └── instagram.js   публикация IMAGE/REELS/STORIES через graph.instagram.com
+  ├── telegram.js        уведомления в аналитический бот
+  └── usage.js           лимиты и расход
+```
+
+bot.js                  главный процесс (cron: scan 15мин, scheduler 1мин)
+cli.js                  управление
+```
 
 bot.js                  главный процесс (cron: scan 15мин, scheduler 1мин)
 cli.js                  управление
@@ -99,6 +118,72 @@ json
   }]
 }
 Срок жизни: 60 дней. Обновляется через Meta Developer.
+
+### Расписание по городам (citySchedules)
+
+Каждый город имеет свою таймзону и пиковые часы. Один пост уходит на N матч-аккаунтов, но **каждый аккаунт получает своё индивидуальное время** — per-account queue items с рандомным джиттером ±15 мин. Это выглядит как человеческое поведение, а не бот.
+
+В `project.json`:
+
+```json
+"citySchedules": {
+  "yerevan": {
+    "timezone": "Asia/Yerevan",
+    "peakHours": ["11:00", "20:00"],
+    "storiesAfterHour": 18,
+    "storiesUntilHour": 23
+  },
+  "bali": {
+    "timezone": "Asia/Makassar",
+    "peakHours": ["11:00", "19:00"],
+    "storiesAfterHour": 18,
+    "storiesUntilHour": 23
+  }
+}
+Как работает:
+
+Аккаунт → город → citySchedules[city]
+
+Выбирается случайный пиковый час + джиттер ±15 мин (±10 для Stories)
+
+Для Stories отсекаются слоты до storiesAfterHour в локальной TZ
+
+Для каждого аккаунта создаётся отдельный queue-item со своим scheduledAt
+
+Пример: пост уходит на 10 городов. Аккаунты разных TZ публикуют в течение нескольких часов, каждый — в своём пиковом окне локального времени.
+
+### Telegram-приём контента
+
+Отдельный бот для приёма фото/видео (`TELEGRAM_INGEST_BOT_TOKEN`).
+
+**Как использовать:**
+
+1. Открой бота, отправь `/project coucou-events`
+2. Кидай файлы:
+   - **фото без подписи** → `inbox/` → IMAGE
+   - **видео без подписи** → `inbox/` → REELS
+   - **фото/видео с `#stories`** в подписи → `inbox-stories/` → STORIES
+3. Дальше бот сам: vision → caption → per-account планирование → Instagram
+
+**Фичи:**
+
+- Пересылка из любого чата (forward) — бот пометит источник
+- Альбомы (медиагруппы) — скачиваются все файлы, один ответ
+- ZIP-архивы — распаковываются, только jpg/png/mp4/mov
+- Whitelist по `TELEGRAM_INGEST_USERS` (список user_id)
+- `#slug` в подписи переключает проект на одно сообщение
+
+### Обработка видео
+
+Видео из `inbox/` проходит через `video-processor.js`:
+
+1. **ffmpeg** → 9:16, 1080×1920, H.264 + AAC, faststart
+2. **Вотермарка** — PNG-лого в правом нижнем углу (настраивается через `publishing.video`)
+3. **Кадр для vision** — извлекается автоматически, Gemini анализирует кадр (не само видео)
+4. **Обложка** — сохраняется из 1-й секунды, передаётся в Instagram как `cover_url`
+
+Лимиты по умолчанию: 90 сек, 1080×1920, watermarkHeight=120, padding=32.
+
 
 Лимиты (в .env)
 LIMIT_GROQ_TOKENS_DAY=200000

@@ -12,6 +12,7 @@ import { pickBestMatches } from './matcher.js';
 import { scheduleNext } from './planner.js';
 import * as queue from './queue.js';
 import { notifyScheduled } from './telegram.js';
+import { toQueueAccountRef } from './accounts-resolver.js';
 import { loadProject, loadAccounts } from './config-loader.js';
 import { pickLandmarkForVision, buildCaptionContext } from './locations.js';
 
@@ -244,12 +245,7 @@ export async function scanProject(projectPath, { dryRun = false } = {}) {
           videoPath: mediaType === 'REELS' ? scheduledPath : null,
           videoUrl,
           videoCoverUrl,
-          accounts: [{
-            username: acc.username,
-            igUserId: acc.igUserId,
-            accessToken: acc.accessToken,
-            city: acc.city,
-          }],
+          accounts: [toQueueAccountRef(acc)],
           caption,
           hashtags: finalHashtags,
           visionTags: vision.tags,

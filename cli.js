@@ -240,10 +240,16 @@ async function main() {
         console.log(`   Перенесено: ${r.migrated}`);
         console.log(`   Пропущено:  ${r.skipped}`);
         if (r.deletedOld) console.log(`   queue.json → queue.json.migrated`);
+      } else if (sub === 'strip-tokens') {
+        const { stripTokensAll } = await import('./agent/queue-strip-tokens.js');
+        console.log('🔐 Удаляю accessToken из очереди...');
+        const r = await stripTokensAll();
+        console.log(r);
       } else {
         console.log('Использование:');
         console.log('  node cli.js queue info');
         console.log('  node cli.js queue migrate [--delete-old]');
+        console.log('  node cli.js queue strip-tokens');
       }
       break;
     }
@@ -271,6 +277,31 @@ async function main() {
       break;
     }
 
+    case 'modules': {
+      const { getModuleFlags, modulesStartupText } = await import('./agent/orchestrator.js');
+      const flags = getModuleFlags();
+      console.log('📦 Модули orchestrator\n');
+      console.log('  ' + modulesStartupText(flags));
+      console.log('\nФлаги:');
+      for (const [k, v] of Object.entries(flags)) {
+        console.log(`  ${k.padEnd(12)} ${v ? 'ON' : 'off'}`);
+      }
+      console.log('\nEnv:');
+      console.log(`  ENABLE_SMM=${process.env.ENABLE_SMM ?? '(default 1)'}`);
+      console.log(`  ENABLE_SUPPLIER_BOT=${process.env.ENABLE_SUPPLIER_BOT ?? '(default 1)'}`);
+      console.log(`  ENABLE_OUTREACH=${process.env.ENABLE_OUTREACH ?? '(default 1)'}`);
+      console.log(`  SUPPLIER_BOT_TOKEN=${process.env.SUPPLIER_BOT_TOKEN ? 'set' : 'empty'}`);
+      break;
+    }
+
+    case 'outreach-tick': {
+      const { outreachTick } = await import('./agent/orchestrator.js');
+      console.log('🤝 Outreach tick...\n');
+      const r = await outreachTick({ onLog: console.log });
+      console.log('\nИтог:', r);
+      break;
+    }
+
     case 'help':
     default:
       console.log(`SMM Bot CLI
@@ -293,7 +324,9 @@ Fetching:
   node cli.js fetch instagram-user --ig-user-id <id> --project <slug> [--limit N]
 
 Основной процесс:
-  node bot.js              — постоянный процесс с cron`);
+  node bot.js              — оркестратор (SMM + supplier + outreach)
+  node cli.js modules      — какие модули включены
+  node cli.js outreach-tick — разовая сводка outreach в Telegram`);
   }
 }
 

@@ -91,7 +91,11 @@ export async function handleMessage(msg, projectPath) {
   }
 
   const query = parseQuery(text);
-  const result = matchSuppliers(projectPath, query);
+  const result = matchSuppliers(projectPath, query, {
+    strictCity: true,
+    allowCityFallback: false,
+    // verified не режем насмерть, если база пустая — но ranking ставит ✅ выше
+  });
   const reply = formatReply(query, result);
   await sendMessage(chatId, reply);
 }
@@ -104,6 +108,20 @@ export function startSupplierBot({ projectPath, onLog = console.log }) {
 
   (async () => {
     onLog('🤖 Supplier bot started');
+
+    // Сбросить накопленные апдейты (иначе бот висит на старых сообщениях)
+    try {
+      await fetch(`https://api.telegram.org/bot${getToken()}/getUpdates?offset=-1`, { method: 'GET' });
+      const dropRes = await fetch(`https://api.telegram.org/bot${getToken()}/getUpdates?offset=-1`);
+      const dropData = await dropRes.json();
+      if (dropData.ok && dropData.result?.length) {
+        offset = dropData.result[dropData.result.length - 1].update_id + 1;
+        onLog(`   сбросил старых апдейтов, offset=${offset}`);
+      }
+    } catch (e) {
+      onLog(`   не удалось сбросить бэклог: ${e.message}`);
+    }
+
     while (running) {
       try {
         const updates = await getUpdates(offset);

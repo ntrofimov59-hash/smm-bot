@@ -53,6 +53,41 @@ function normalizeName(n) {
   return String(n || '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+
+function sanitizeContactFields(supplier) {
+  // phone: только если похож на телефон, иначе убрать (OSM часто даёт мусор)
+  if (supplier.phone) {
+    const digits = String(supplier.phone).replace(/\D/g, '');
+    if (digits.length < 7 || digits.length > 15) {
+      delete supplier.phone;
+    } else {
+      // оставляем как есть, если проходит мягкий паттерн
+      const ok = /^[+\d][\d\s\-()]{6,20}$/.test(String(supplier.phone));
+      if (!ok) delete supplier.phone;
+    }
+  }
+  if (supplier.email) {
+    const e = String(supplier.email).trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) delete supplier.email;
+    else supplier.email = e;
+  }
+  if (supplier.website) {
+    let w = String(supplier.website).trim();
+    if (w && !/^https?:\/\//i.test(w)) w = 'https://' + w;
+    try {
+      const u = new URL(w);
+      if (!['http:', 'https:'].includes(u.protocol)) delete supplier.website;
+      else supplier.website = u.toString();
+    } catch {
+      delete supplier.website;
+    }
+  }
+  if (supplier.sourceUrl) {
+    try { new URL(supplier.sourceUrl); } catch { delete supplier.sourceUrl; }
+  }
+  return supplier;
+}
+
 export function findDuplicate(list, candidate) {
   const phone = normalizePhone(candidate.phone);
   const name = normalizeName(candidate.name);
@@ -138,6 +173,8 @@ export function addSupplier(projectPath, input) {
     if (supplier[f] === undefined) delete supplier[f];
   }
 
+  sanitizeContactFields(supplier);
+
   // Валидация
   const r = SupplierSchema.safeParse(supplier);
   if (!r.success) {
@@ -212,6 +249,8 @@ export function updateSupplier(projectPath, id, patch) {
     for (const f of OPTIONAL_FIELDS) {
       if (merged[f] === undefined) delete merged[f];
     }
+
+    sanitizeContactFields(merged);
 
     const r = SupplierSchema.safeParse(merged);
     if (!r.success) {

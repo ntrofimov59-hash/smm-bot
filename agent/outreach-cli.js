@@ -369,6 +369,57 @@ async function cmdStats(args) {
   console.log(JSON.stringify({ total: all.length, byStatus: all.reduce((a, c) => { a[c.status] = (a[c.status] || 0) + 1; return a; }, {}) }, null, 2));
 }
 
+
+async function cmdHarvest(args) {
+  const [slug] = args._;
+  const p = projectPath(need(slug, 'project'));
+  const city = need(args.flags.city, 'city');
+  const segments = args.flags.segments
+    ? String(args.flags.segments).split(',').map(s => s.trim())
+    : ['venue', 'agency'];
+  const sources = args.flags.sources
+    ? String(args.flags.sources).split(',').map(s => s.trim())
+    : null;
+  const { harvestClients } = await import('./outreach/harvest.js');
+  const stats = await harvestClients(p, {
+    city,
+    segments,
+    sources,
+    limitPerQuery: Number(args.flags.limit || 12),
+  });
+  console.log(JSON.stringify(stats, null, 2));
+}
+
+async function cmdSources(args) {
+  const { CLIENT_SOURCES, listReadySources } = await import('./outreach/sources/registry.js');
+  const city = args.flags.city || null;
+  const list = city ? listReadySources({ city }) : CLIENT_SOURCES;
+  for (const s of (city ? list : CLIENT_SOURCES)) {
+    console.log(`${s.status.padEnd(12)} ${s.id.padEnd(22)} ${s.name}  [${(s.types||[]).join(',')}]`);
+    if (s.notes) console.log(`             ${s.notes}`);
+  }
+}
+
+
+async function cmdPrune(args) {
+  const [slug] = args._;
+  const p = projectPath(need(slug, 'project'));
+  const { assessRelevance } = await import('./outreach/relevance.js');
+  const dry = !!args.flags.dry;
+  const city = args.flags.city || null;
+  const list = store.listCandidates(p, { status: args.flags.status || 'found', city });
+  let killed = 0, kept = 0;
+  for (const c of list) {
+    const rel = assessRelevance(c);
+    if (!rel.ok) {
+      if (!dry) store.updateCandidate(p, c.id, { status: 'rejected', notes: `prune:${rel.reason}` });
+      killed++;
+      console.log(`${dry ? 'DRY ' : ''}❌ ${c.name} (${rel.reason})`);
+    } else kept++;
+  }
+  console.log(`\n${dry ? 'DRY ' : ''}rejected: ${killed}, kept: ${kept}`);
+}
+
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const args = parseArgs(rest);
@@ -392,6 +443,9 @@ async function main() {
     followups: cmdFollowups,
     summary: cmdSummary,
     stats: cmdStats,
+    harvest: cmdHarvest,
+    prune: cmdPrune,
+    sources: cmdSources,
   };
 
   if (!cmd || !handlers[cmd]) {
@@ -412,6 +466,9 @@ async function main() {
   followups <project>
   summary <project>
   stats <project>
+  harvest <project> --city yerevan [--segments venue,agency] [--sources google_places,osm,twogis]
+  sources [--city yerevan]
+  prune <project> [--city yerevan] [--dry]
 
 Ничего не отправляет. Генерирует ссылки и текст — отправка вручную.
 `);
