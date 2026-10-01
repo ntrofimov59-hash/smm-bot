@@ -28,6 +28,11 @@ const CITY_KEYWORDS = {
   casablanca: ['касабланка', 'casablanca'],
   danang: ['дананг', 'danang', 'да нанг'],
   nha_trang: ['нячанг', 'nha trang', 'nhatrang'],
+  antalya: ['анталья', 'антали', 'antalya'],
+  belgrade: ['белград', 'belgrade'],
+  budapest: ['будапешт', 'budapest'],
+  goa: ['гоа', 'goa'],
+  srilanka: ['шри-ланка', 'шри ланка', 'sri lanka', 'коломбо', 'colombo'],
 };
 
 export function parseQuery(text) {

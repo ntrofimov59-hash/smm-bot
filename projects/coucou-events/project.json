@@ -608,6 +608,51 @@
       ],
       "storiesAfterHour": 18,
       "storiesUntilHour": 23
+    },
+    "antalya": {
+      "timezone": "Europe/Istanbul",
+      "peakHours": [
+        "12:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "belgrade": {
+      "timezone": "Europe/Belgrade",
+      "peakHours": [
+        "12:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "budapest": {
+      "timezone": "Europe/Budapest",
+      "peakHours": [
+        "12:00",
+        "20:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "goa": {
+      "timezone": "Asia/Kolkata",
+      "peakHours": [
+        "11:00",
+        "19:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
+    },
+    "srilanka": {
+      "timezone": "Asia/Colombo",
+      "peakHours": [
+        "11:00",
+        "19:00"
+      ],
+      "storiesAfterHour": 18,
+      "storiesUntilHour": 23
     }
   }
 }

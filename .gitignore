@@ -28,3 +28,4 @@ agent/prompts/*.before-*
 projects/*/suppliers/
 projects/*/telegram-monitor/
 projects/*/outreach/
+!projects/coucou-events/telegram-monitor/discovery-queries.json
