@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "category": "caterers",
+  "updatedAt": "2026-10-01T18:08:11.745Z",
+  "suppliers": [
+    {
+      "id": "s-1790878091743-f468c0",
+      "name": "Tosp Catering",
+      "category": "caterers",
+      "city": "yerevan",
+      "languages": [],
+      "phone": "+374 10 444 555",
+      "email": "info@tosp.am",
+      "priceRange": "$$$",
+      "worksWithForeigners": true,
+      "tags": [],
+      "verified": true,
+      "source": "manual",
+      "addedAt": "2026-10-01T18:08:11.743Z",
+      "updatedAt": "2026-10-01T18:08:11.743Z",
+      "projectsCount": 0
+    }
+  ]
+}
