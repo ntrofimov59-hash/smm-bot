@@ -28,6 +28,9 @@ import * as drafter from './outreach/drafter.js';
 import * as links from './outreach/links.js';
 import * as reminders from './outreach/reminders.js';
 import * as sources from './outreach/sources/index.js';
+import { searchOverpass } from './outreach/sources/overpass.js';
+import { search2GIS } from './outreach/sources/twogis.js';
+import { enrichCandidate } from './outreach/enrich.js';
 import { loadProject } from './config-loader.js';
 
 function projectPath(slug) {
@@ -116,6 +119,97 @@ async function cmdSearch(args) {
     }
   }
   console.log(`✅ Добавлено: ${added}, дубликатов: ${dup}`);
+}
+
+
+
+
+async function cmdEnrich(args) {
+  const [slug, id] = args._;
+  const p = projectPath(need(slug, 'project'));
+
+  const list = args.flags.all
+    ? store.listCandidates(p, { status: args.flags.status || 'found' })
+    : [store.getCandidate(p, need(id, 'id'))].filter(Boolean);
+
+  if (!list.length) {
+    console.error('❌ Не найдено');
+    process.exit(1);
+  }
+
+  let ok = 0, noop = 0;
+  for (const c of list) {
+    process.stdout.write(`🔍 ${c.name} ... `);
+    const r = await enrichCandidate(c);
+    if (r.ok) {
+      store.updateCandidate(p, c.id, r.updated);
+      console.log(`✅ +${Object.keys(r.updated).join(', ')} (${r.source})`);
+      ok++;
+    } else {
+      console.log('—');
+      noop++;
+    }
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  console.log(`\nОбогащено: ${ok}, без изменений: ${noop}`);
+}
+
+async function cmdSearch2GIS(args) {
+  const [slug] = args._;
+  const p = projectPath(need(slug, 'project'));
+  const city = need(args.flags.city, 'city');
+  const segment = args.flags.segment || 'venue';
+
+  console.log(`🏙  2GIS: ${city} (${segment}) ...`);
+  const found = await search2GIS({
+    city,
+    segment,
+    query: args.flags.query || null,
+    limit: Number(args.flags.limit || 50),
+    locale: args.flags.locale || null,
+  });
+  console.log(`Найдено: ${found.length}`);
+
+  let added = 0, dup = 0;
+  for (const c of found) {
+    try { store.addCandidate(p, c); added++; }
+    catch (e) { if (String(e.message).includes('дубликат')) dup++; }
+  }
+  console.log(`✅ Добавлено: ${added}, дубликатов: ${dup}`);
+}
+
+async function cmdSearchOsm(args) {
+  const [slug] = args._;
+  const p = projectPath(need(slug, 'project'));
+  const city = need(args.flags.city, 'city');
+  const segment = args.flags.segment || 'venue';
+
+  console.log(`🌍 Overpass/OSM: ${city} (${segment}) ...`);
+  const found = await searchOverpass({
+    city,
+    country: args.flags.country || null,
+    segment,
+    radius: Number(args.flags.radius || 8000),
+    limit: Number(args.flags.limit || 100),
+  });
+  console.log(`Найдено: ${found.length}`);
+
+  let added = 0, dup = 0, noContact = 0;
+  for (const c of found) {
+    if (!c.phone && !c.email && !c.instagram && !c.website) {
+      noContact++;
+      // Всё равно добавляем — контакт можно найти вручную
+    }
+    try {
+      store.addCandidate(p, c);
+      added++;
+    } catch (e) {
+      if (String(e.message).includes('дубликат')) dup++;
+      else console.warn('  warning:', e.message);
+    }
+  }
+  console.log(`✅ Добавлено: ${added}, дубликатов: ${dup}`);
+  if (noContact) console.log(`⚠️  Без прямых контактов: ${noContact} (проверь вручную)`);
 }
 
 async function cmdImport(args) {
@@ -282,6 +376,9 @@ async function main() {
   const handlers = {
     add: cmdAdd,
     search: cmdSearch,
+    'search-osm': cmdSearchOsm,
+    'search-2gis': cmdSearch2GIS,
+    enrich: cmdEnrich,
     import: cmdImport,
     list: cmdList,
     rank: cmdRank,
@@ -301,7 +398,11 @@ async function main() {
     console.log(`outreach-cli — команды:
 
   add <project> --name "..." --segment venue --city yerevan [--phone +374...]
-  search <project> --query "wedding venue Yerevan" [--city yerevan] [--limit 10]
+  search <project> --query "..." [--city yerevan] [--limit 10]  (Google Places)
+  search-osm <project> --city yerevan [--segment venue] [--radius 8000]  (OpenStreetMap, без ключа)
+  search-2gis <project> --city "Ереван" [--segment venue]  (2GIS, бесплатный демо-ключ)
+  enrich <project> <id>                    (добрать контакты через OSM)
+  enrich <project> --all [--status found]  (обогатить всех)
   import <project>                       (из outreach/manual.json)
   list <project> [--status found]
   rank <project> [--top 20]
