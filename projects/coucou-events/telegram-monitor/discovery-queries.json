@@ -1,0 +1,250 @@
+{
+  "yerevan": {
+    "queries": [
+      "yerevan expats",
+      "yerevan community",
+      "yerevan events",
+      "yerevan digital nomads",
+      "ереван чат",
+      "ереван экспаты",
+      "ереван события",
+      "релокация армения",
+      "армения экспаты",
+      "yerevan wedding",
+      "свадьба ереван",
+      "yerevan wedding planner",
+      "yerevan event planner",
+      "yerevan photographer",
+      "фотограф ереван",
+      "yerevan catering",
+      "кейтеринг ереван",
+      "yerevan florist",
+      "yerevan decorator",
+      "yerevan dj",
+      "yerevan venue",
+      "площадка ереван",
+      "арарат свадьба",
+      "ереван банкет",
+      "ереван корпоратив",
+      "yerevan corporate"
+    ]
+  },
+  "tbilisi": {
+    "queries": [
+      "tbilisi expats",
+      "tbilisi community",
+      "tbilisi events",
+      "tbilisi digital nomads",
+      "тбилиси чат",
+      "тбилиси экспаты",
+      "тбилиси события",
+      "релокация грузия",
+      "грузия экспаты",
+      "tbilisi wedding",
+      "свадьба тбилиси",
+      "tbilisi wedding planner",
+      "tbilisi event planner",
+      "tbilisi photographer",
+      "фотограф тбилиси",
+      "tbilisi catering",
+      "tbilisi venue",
+      "tbilisi corporate",
+      "тбилиси банкет",
+      "тбилиси корпоратив",
+      "tbilisi florist"
+    ]
+  },
+  "bali": {
+    "queries": [
+      "bali expats",
+      "bali digital nomads",
+      "bali community",
+      "canggu community",
+      "ubud community",
+      "bali wedding",
+      "bali wedding planner",
+      "bali event planner",
+      "bali events",
+      "bali photographer",
+      "bali videographer",
+      "bali catering",
+      "bali venue",
+      "bali villa wedding",
+      "bali florist",
+      "bali decorator",
+      "bali dj",
+      "bali corporate event",
+      "bali entrepreneurs"
+    ]
+  },
+  "phuket": {
+    "queries": [
+      "phuket expats",
+      "phuket community",
+      "phuket events",
+      "phuket digital nomads",
+      "phuket wedding",
+      "phuket wedding planner",
+      "phuket event planner",
+      "phuket photographer",
+      "phuket venue",
+      "phuket villa",
+      "phuket catering"
+    ]
+  },
+  "prague": {
+    "queries": [
+      "prague expats",
+      "prague community",
+      "prague events",
+      "prague digital nomads",
+      "прага чат",
+      "прага экспаты",
+      "прага релокация",
+      "prague wedding",
+      "prague wedding planner",
+      "prague event planner",
+      "свадьба прага",
+      "prague photographer",
+      "prague venue",
+      "prague catering"
+    ]
+  },
+  "barcelona": {
+    "queries": [
+      "barcelona expats",
+      "barcelona digital nomads",
+      "barcelona community",
+      "barcelona events",
+      "barcelona wedding",
+      "barcelona event planner",
+      "barcelona wedding planner",
+      "barcelona photographer",
+      "barcelona venue",
+      "barcelona catering"
+    ]
+  },
+  "marrakech": {
+    "queries": [
+      "marrakech expats",
+      "marrakech events",
+      "marrakech community",
+      "marrakech wedding",
+      "marrakech wedding planner",
+      "marrakech event planner",
+      "marrakech photographer",
+      "marrakech venue",
+      "marrakech riad"
+    ]
+  },
+  "casablanca": {
+    "queries": [
+      "casablanca expats",
+      "casablanca events",
+      "casablanca community",
+      "casablanca wedding",
+      "morocco wedding",
+      "morocco event planner",
+      "casablanca photographer",
+      "casablanca venue"
+    ]
+  },
+  "danang": {
+    "queries": [
+      "danang expats",
+      "danang community",
+      "danang events",
+      "danang digital nomads",
+      "danang wedding",
+      "danang wedding planner",
+      "danang photographer",
+      "дананг экспаты",
+      "дананг чат",
+      "дананг свадьба"
+    ]
+  },
+  "nha_trang": {
+    "queries": [
+      "nha trang expats",
+      "nha trang community",
+      "nha trang events",
+      "nha trang digital nomads",
+      "nha trang wedding",
+      "nha trang wedding planner",
+      "нячанг экспаты",
+      "нячанг чат"
+    ]
+  },
+  "antalya": {
+    "queries": [
+      "antalya expats",
+      "antalya events",
+      "antalya wedding",
+      "antalya digital nomads",
+      "анталия экспаты",
+      "анталия чат",
+      "анталия свадьба",
+      "анталия события",
+      "antalya wedding planner",
+      "antalya photographer",
+      "antalya venue",
+      "antalya catering"
+    ]
+  },
+  "belgrade": {
+    "queries": [
+      "belgrade expats",
+      "belgrade events",
+      "belgrade wedding",
+      "belgrade digital nomads",
+      "белград экспаты",
+      "белград чат",
+      "белград события",
+      "belgrade wedding planner",
+      "belgrade photographer",
+      "belgrade venue"
+    ]
+  },
+  "budapest": {
+    "queries": [
+      "budapest expats",
+      "budapest events",
+      "budapest wedding",
+      "budapest digital nomads",
+      "будапешт экспаты",
+      "будапешт чат",
+      "будапешт события",
+      "budapest wedding planner",
+      "budapest photographer",
+      "budapest venue"
+    ]
+  },
+  "goa": {
+    "queries": [
+      "goa expats",
+      "goa events",
+      "goa wedding",
+      "goa digital nomads",
+      "гоа экспаты",
+      "гоа чат",
+      "гоа свадьба",
+      "goa wedding planner",
+      "goa photographer",
+      "goa venue",
+      "goa events"
+    ]
+  },
+  "srilanka": {
+    "queries": [
+      "sri lanka expats",
+      "sri lanka events",
+      "sri lanka wedding",
+      "sri lanka digital nomads",
+      "colombo expats",
+      "colombo events",
+      "sri lanka wedding planner",
+      "sri lanka photographer",
+      "sri lanka venue"
+    ]
+  }
+}
